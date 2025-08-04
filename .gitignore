@@ -1,0 +1,2 @@
+# Bỏ qua toàn bộ thư mục __pycache__ ở mọi cấp
+__pycache__/

@@ -1,0 +1,24 @@
+Thiết kế đồ họa 
+
+1. Concept Art
+Mục tiêu: Tạo cái nhìn tổng quát về phong cách và hình dạng ban đầu của nhân vật, môi trường, vật phẩm.
+- Xác định bối cảnh: 
+- Phác thảo ý tưởng sơ bộ 
+
+2. Character Design
+Mục tiêu: Vẽ chi tiết nhân vật với biểu cảm, dáng đứng, animation.
+- Tạo “model sheet”: gồm các góc nhìn (trước, nghiêng, sau).
+
+3. Environment Design
+Mục tiêu: Thiết kế background và bối cảnh tạo cảm xúc cho người chơi.
+- Vẽ background chính cho từng màn chơi.
+- tạo tile set nếu game dùng tilemap.
+
+4. Asset & UI Design
+Mục tiêu: Tạo mọi yếu tố hiển thị trên màn hình game.
+- Vẽ icon cho item, coin, potion, vũ khí, v.v.
+- Thiết kế giao diện người chơi: nút, bảng giao diện,...
+
+5. Animation
+Mục tiêu: Tạo chuyển động mượt mà cho nhân vật và các đối tượng.
+- Tạo frame chuyển động: idle, chạy, tấn công, trúng đòn, chết...
