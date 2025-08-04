@@ -5,6 +5,8 @@ FPS = 60
 
 DEFAULT_BUTTON_WIDTH = 200
 DEFAULT_BUTTON_HEIGHT = 50
+DEFAULT_BOARD_WIDTH = 500
+DEFAULT_BOARD_HEIGHT = 500
 
 class Color:
     BLACK = (0, 0, 0)
@@ -12,3 +14,4 @@ class Color:
     RED = (255, 0, 0)
     GREEN = (0, 255, 0)
     BLUE = (0, 0, 255)
+    YELLOW = (255, 255, 0)

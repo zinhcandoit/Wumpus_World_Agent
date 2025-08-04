@@ -1,5 +1,6 @@
 from Screen.BaseScreen import Screen
 from Design.UI.button import Button
+from Design.UI.board import Board
 from constant import *
 import pygame
 import sys
@@ -8,6 +9,16 @@ class MainMenuScreen(Screen):
     def __init__(self, screen_manager):
         super().__init__(screen_manager)
         
+        self.menu_board = Board(
+            DEFAULT_BOARD_WIDTH, 
+            DEFAULT_BOARD_WIDTH, 
+            100, 
+            100, 
+            Color.WHITE, 
+            Color.YELLOW, 
+            5
+        )
+
         self.play_btn = Button(
             "Play", 
             "Arial", 
@@ -36,10 +47,12 @@ class MainMenuScreen(Screen):
 
     def draw(self, surface):
         surface.fill(Color.BLACK)        
+        self.menu_board.draw(surface)
         self.play_btn.draw(surface)
         self.quit_btn.draw(surface)
 
     def update(self):
+        self.menu_board.update()
         self.play_btn.update()
         self.quit_btn.update()
 
