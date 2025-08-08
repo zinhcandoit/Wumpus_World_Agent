@@ -1,8 +1,3 @@
-class Percept:
-    def __init__(self, name, pos):
-        self.name = name      # "breeze", "stench", "glitter", etc.
-        self.pos = pos        # (x, y)
-
 class Literal:
     def __init__(self, name, pos, negate=False):
         self.name = name

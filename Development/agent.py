@@ -15,7 +15,7 @@ class Agent:
         directions = ['N', 'E', 'S', 'W']
         current_index = directions.index(self.direction)
         if action == 'turn left':
-                new_index = (current_index - 1) % 4
+                new_index = (current_index - 1) % 4 
         else:
                 new_index = (current_index + 1) % 4
         self.direction = directions[new_index]
@@ -26,13 +26,13 @@ class Agent:
         kb = []
         look_around = [(0, 1), (1, 0), (0, -1), (-1, 0)]
         if not self.percepts:
-            # percepts is empty means no wumpus, no pit, no gold
+            # percepts is empty means no wumpus, no pit
             for dy, dx in look_around:
                 pos = (self.location[0] + dy, self.location[1] + dx)
                 kb.append([Literal("pit", pos, True)])
                 kb.append([Literal("wumpus", pos, True)])
-                kb.append([Literal("gold", pos, True)])
             return kb
+        # KB is an CNF sentence
         for percept in self.percepts:
             rules = []
             # If there's glitter, then gold is present
@@ -53,7 +53,7 @@ class Agent:
             # Agent hit a wall means it knows the size of the map
             if percept.name == 'bump':
                 self.size_known = max(percept.pos[0], percept.pos[1]) + 1
-            # If agent killed wumpus, it knows wumpus is gone in that direction
+            # If agent killed wumpus, it knows wumpus is gone in that direction (Need to fix later)
             if percept.name == 'scream':
                 direction_moves = {'N': (-1, 0), 'S': (1, 0), 'W': (0, -1), 'E': (0, 1)}
                 dy, dx = direction_moves[self.direction]
@@ -67,7 +67,8 @@ class Agent:
             for dy, dx in look_around:
                 new_y, new_x = self.location[0] + dy, self.location[1] + dx
                 if 0 <= new_y < self.size_known and 0 <= new_x < self.size_known:
-                    kb.append([Literal("pit", (new_y, new_x), True), Literal("wumpus", (new_y, new_x), True)])
+                    kb.append([Literal("pit", (new_y, new_x), True), Literal("wumpus", (new_y, new_x), True)]) # XOR
+                    
 
         self.percepts = []  # Clear percepts after extracting KB
         self.KB.extend(kb)
