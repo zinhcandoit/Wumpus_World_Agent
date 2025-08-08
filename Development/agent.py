@@ -6,6 +6,7 @@ class Agent:
         self.direction = 'E'
         self.has_gold = False
         self.has_arrow = True
+        self.size_known = 100 # Default size, will be updated after first bump
         self.visited = set()
         self.percepts =[] # New percepts at current location
         self.KB = []  # Agent won't know the size of the map until getting bump
@@ -23,14 +24,54 @@ class Agent:
         """        Extract knowledge base from agent's percepts
         """
         kb = []
+        look_around = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+        if not self.percepts:
+            # percepts is empty means no wumpus, no pit, no gold
+            for dy, dx in look_around:
+                pos = (self.location[0] + dy, self.location[1] + dx)
+                kb.append([Literal("pit", pos, True)])
+                kb.append([Literal("wumpus", pos, True)])
+                kb.append([Literal("gold", pos, True)])
+            return kb
         for percept in self.percepts:
-            if isinstance(percept, Literal):
-                kb.append([percept])
-            else:
-                # Handle other percept types if needed
-                pass
+            rules = []
+            # If there's glitter, then gold is present
+            if percept.name == 'glitter':
+                kb.append(Literal("gold", percept.pos, False))  # Gold is present
+            # If there's a stench, then wumpus is nearby
+            # If there's a breeze, then pit is nearby
+            if percept.name == 'stench':
+                for dy, dx in look_around:
+                    new_y, new_x = percept.pos[0] + dy, percept.pos[1] + dx
+                    if 0 <= new_y < self.size_known and 0 <= new_x < self.size_known:
+                        rules.append(Literal("wumpus", (new_y, new_x), False))
+            if percept.name == 'breeze':
+                for dy, dx in look_around:
+                    new_y, new_x = percept.pos[0] + dy, percept.pos[1] + dx
+                    if 0 <= new_y < self.size_known and 0 <= new_x < self.size_known:
+                        rules.append(Literal("pit", (new_y, new_x), False))
+            # Agent hit a wall means it knows the size of the map
+            if percept.name == 'bump':
+                self.size_known = max(percept.pos[0], percept.pos[1]) + 1
+            # If agent killed wumpus, it knows wumpus is gone in that direction
+            if percept.name == 'scream':
+                direction_moves = {'N': (-1, 0), 'S': (1, 0), 'W': (0, -1), 'E': (0, 1)}
+                dy, dx = direction_moves[self.direction]
+                for i in range(1, self.size_known):
+                    new_y, new_x = self.location[0] + i * dy, self.location[1] + i * dx
+                    if 0 <= new_y < self.size_known and 0 <= new_x < self.size_known:
+                        rules.append(Literal("wumpus", (new_y, new_x), True))
+            kb.append(rules)
+        # Pit and Wumpus can not in the same cell
+        if 'stench' in self.percepts and 'breeze' in self.percepts:
+            for dy, dx in look_around:
+                new_y, new_x = self.location[0] + dy, self.location[1] + dx
+                if 0 <= new_y < self.size_known and 0 <= new_x < self.size_known:
+                    kb.append([Literal("pit", (new_y, new_x), True), Literal("wumpus", (new_y, new_x), True)])
+
         self.percepts = []  # Clear percepts after extracting KB
         self.KB.extend(kb)
+# Phần sau AI làm hết :>>>
         
     def extract_symbols(self, kb=None, alpha=None):
         """Extract all propositional symbol keys from KB and alpha"""
