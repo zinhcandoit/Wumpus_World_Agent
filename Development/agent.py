@@ -1,4 +1,6 @@
 from definition import Literal
+import random
+from algorithm import get_possible_actions
 class Agent:
     def __init__(self, num_wumpus=2):
         self.location = (-1, 0)
@@ -27,6 +29,11 @@ class Agent:
         look_around = [(0, 1), (1, 0), (0, -1), (-1, 0)]
         if not self.percepts:
             # percepts is empty means no wumpus, no pit
+            kb.append([Literal("pit", self.location, True)])  # ¬Pit
+            kb.append([Literal("wumpus", self.location, True)])  # ¬Wumpus
+            kb.append([Literal("gold", self.location, True)])  # ¬Gold
+            kb.append([Literal("breeze", self.location, True)])  # ¬Breeze
+            kb.append([Literal("stench", self.location, True)])  # ¬Stench
             for dy, dx in look_around:
                 pos = (self.location[0] + dy, self.location[1] + dx)
                 kb.append([Literal("pit", pos, True)])
@@ -45,34 +52,49 @@ class Agent:
                     new_y, new_x = percept.pos[0] + dy, percept.pos[1] + dx
                     if 0 <= new_y < self.size_known and 0 <= new_x < self.size_known:
                         rules.append(Literal("wumpus", (new_y, new_x), False))
+                        kb.append([Literal("wumpus", (new_y, new_x), True), percept])
+                percept.negated = True  # Negate the literal for CNF
+                rules.append(percept)
             if percept.name == 'breeze':
                 for dy, dx in look_around:
                     new_y, new_x = percept.pos[0] + dy, percept.pos[1] + dx
                     if 0 <= new_y < self.size_known and 0 <= new_x < self.size_known:
                         rules.append(Literal("pit", (new_y, new_x), False))
+                        kb.append([Literal("pit", (new_y, new_x), True), percept])
+                percept.negated = True  # Negate the literal for CNF
+                rules.append(percept)
             # Agent hit a wall means it knows the size of the map
             if percept.name == 'bump':
                 self.size_known = max(percept.pos[0], percept.pos[1]) + 1
-            # If agent killed wumpus, it knows wumpus is gone in that direction (Need to fix later)
+            # If agent killed wumpus, it knows wumpus is gone in that direction
             if percept.name == 'scream':
                 direction_moves = {'N': (-1, 0), 'S': (1, 0), 'W': (0, -1), 'E': (0, 1)}
                 dy, dx = direction_moves[self.direction]
                 for i in range(1, self.size_known):
                     new_y, new_x = self.location[0] + i * dy, self.location[1] + i * dx
                     if 0 <= new_y < self.size_known and 0 <= new_x < self.size_known:
-                        rules.append(Literal("wumpus", (new_y, new_x), True))
-            kb.append(rules)
+                        if any(Literal("wumpus", (new_y, new_x), False) in rule for rule in self.KB):
+                            rules.append(Literal("wumpus", (new_y, new_x), True))
+                            break
+                    else:
+                        break  # Ra khỏi map
         # Pit and Wumpus can not in the same cell
         if 'stench' in self.percepts and 'breeze' in self.percepts:
             for dy, dx in look_around:
                 new_y, new_x = self.location[0] + dy, self.location[1] + dx
                 if 0 <= new_y < self.size_known and 0 <= new_x < self.size_known:
                     kb.append([Literal("pit", (new_y, new_x), True), Literal("wumpus", (new_y, new_x), True)]) # XOR
+                    kb.append([Literal("pit", (new_y, new_x), False), Literal("wumpus", (new_y, new_x), False)]) # XOR
                     
-
         self.percepts = []  # Clear percepts after extracting KB
         self.KB.extend(kb)
-# Phần sau AI làm hết :>>>
+        
+    def choose_action(self, mode='random'):
+        if mode == 'random':
+            get_action = get_possible_actions(self)
+            return get_action.pop(random.randint(0, len(get_action) - 1))
+
+# Phần sau AI làm hết. Kemenoik :>>>
         
     def extract_symbols(self, kb=None, alpha=None):
         """Extract all propositional symbol keys from KB and alpha"""

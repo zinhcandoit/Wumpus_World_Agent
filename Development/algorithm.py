@@ -1,6 +1,7 @@
 from typing import List, Dict, Any
 from dataclasses import dataclass
 from definition import Literal
+from agent import Agent
 
 @dataclass(frozen=True)
 # Hàm kiểm tra CNF có đúng không trong 1 model đầy đủ
@@ -61,3 +62,30 @@ def tt_check_all(kb: List[List[Literal]], alpha: Any, symbols: List[str], model:
 def tt_entails(kb: List[List[Literal]], alpha: Any) -> bool:
     symbols = extract_symbols(kb, alpha)
     return tt_check_all(kb, alpha, symbols, {})
+
+def get_possible_actions(agent: Agent):
+    """
+    Lấy tất cả các hành động có thể thực hiện của agent.
+    """
+    actions = []
+    direction_moves = {'N': (-1, 0), 'S': (1, 0), 'W': (0, -1), 'E': (0, 1)}
+    dy, dx = direction_moves[agent.direction]
+    if agent.has_arrow:
+        for i in range(1, agent.size_known):
+            new_y, new_x = agent.location[0] + i * dy, agent.location[1] + i * dx
+            if 0 <= new_y < agent.size_known and 0 <= new_x < agent.size_known:
+                wumpus_flag = [Literal("wumpus", (new_y, new_x), False)]
+                if wumpus_flag in agent.KB:
+                    actions.append("shoot")
+                    break
+            else: 
+                break  # Ra khỏi map
+    if not agent.has_gold:
+        actions.append("grab")
+    actions.append('turn left')
+    actions.append('turn right')
+    wumpus_flag = [Literal("wumpus", agent.location + tuple(dy, dx), False)]
+    pit_flag = [Literal("pit", agent.location + tuple(dy, dx), False)]
+    if wumpus_flag not in agent.KB and pit_flag not in agent.KB:
+        actions.append("move")
+
