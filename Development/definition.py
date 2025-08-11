@@ -1,14 +1,14 @@
+from dataclasses import dataclass
+from typing import Tuple
+
+@dataclass(frozen=True)
 class Literal:
-    def __init__(self, name, pos, negate=False):
-        self.name = name
-        self.pos = pos
-        self.negate = negate
-    
-    def __str__(self):
-        return f"{'¬' if self.negate else ''}{self.name}{self.pos}"
+    name: str
+    pos: Tuple[int, int]
+    negate: bool = False
     
     def __repr__(self):
-        return f"Literal('{self.name}', {self.pos}, {self.negate})"
+        return f"{'¬' if self.negate else ''}{self.name}{self.pos}"
     
     def __eq__(self, other):
         if not isinstance(other, Literal):
