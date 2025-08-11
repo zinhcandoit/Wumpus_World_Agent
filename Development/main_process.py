@@ -14,3 +14,6 @@ def play(size, pit_density, num_wumpus):
             game.actions.append("die")
             game.update_score()
             break
+
+if __name__ == '__main__':
+    play(8, 0.2, 2)

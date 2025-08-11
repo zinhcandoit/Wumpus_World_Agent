@@ -15,3 +15,4 @@ class Color:
     GREEN = (0, 255, 0)
     BLUE = (0, 0, 255)
     YELLOW = (255, 255, 0)
+    LIGHT_GRAY = (200, 200, 200)
