@@ -1,6 +1,6 @@
-from definition import Literal
+from Development.definition import Literal
 import random
-from algorithm import get_possible_actions, classify_all_literals, make_clause
+from Development.algorithm import get_possible_actions, classify_all_literals, make_clause
 class Agent:
     def __init__(self, num_wumpus=2, map_size=None):
         self.start_location = (map_size - 1, 0)

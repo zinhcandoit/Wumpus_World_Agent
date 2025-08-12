@@ -1,5 +1,5 @@
-from gameState import Game
-from definition import Literal
+from Development.gameState import Game
+from Development.definition import Literal
 def print_map(map):
     for row in map.grid:
         print(" | ".join(" ".join(cell) for cell in row))
