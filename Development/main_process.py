@@ -11,9 +11,9 @@ def play(size, pit_density, num_wumpus):
     print_map(game.map)
     print('Map size:', game.agent.size_known)
     while True:
-        game.agent.percepts = game.map.get_percepts_for_agent(game.agent)
+        game.agent_take_percepts()  # Agent takes percepts from the map
         game.agent.get_KB_from_percepts()
-        action = game.agent.choose_action()   # We will use random agent / Logic agent for choosing action
+        action = game.agent.choose_action('random')   # We will use random agent / Logic agent for choosing action
         game.actions.append(action)
         game.update_score()
         if action == "climb out":
@@ -30,6 +30,6 @@ def play(size, pit_density, num_wumpus):
             break
     return game.point, game.actions
 
-point, action = play(3, 0.2, 0)  # Example call to play the game with a 4x4 map, 20% pit density, and 2 wumpuses
+point, action = play(4, 0.2, 2)  # Example call to play the game with a 4x4 map, 20% pit density, and 2 wumpuses
 print(f"Final score: {point}")
 print(f"Actions taken: {action}")
