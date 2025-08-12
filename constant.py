@@ -16,3 +16,6 @@ class Color:
     BLUE = (0, 0, 255)
     YELLOW = (255, 255, 0)
     LIGHT_GRAY = (200, 200, 200)
+    DARK_GRAY = (50, 50, 50)
+    DARK_GREEN = (0, 150, 0)
+    DARK_RED = (150, 0, 0)

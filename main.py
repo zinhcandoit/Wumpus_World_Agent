@@ -4,6 +4,7 @@ from constant import *
 from Screen.BaseScreen import ScreenManager
 from Screen.IntroScreen import IntroScreen
 from Screen.MainMenuScreen import MainMenuScreen
+from Screen.GameScreen import GameScreen
 
 class GameManager:
     _instance = None  
@@ -23,6 +24,7 @@ class GameManager:
     def create_all_screens(self):
         self.screen_manager.add_screen('intro', IntroScreen(self.screen_manager))
         self.screen_manager.add_screen('menu', MainMenuScreen(self.screen_manager))
+        self.screen_manager.add_screen('game', GameScreen(self.screen_manager))
 
     def __init__(self):
         # Chỉ init lần đầu

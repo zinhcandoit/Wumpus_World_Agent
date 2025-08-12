@@ -1,6 +1,8 @@
 from Screen.BaseScreen import Screen
 from Design.UI.button import Button
 from Design.UI.board import Board
+from Design.UI.text import Text
+from Design.ImageManager.Image import Image
 from constant import *
 import pygame
 import sys
@@ -9,50 +11,27 @@ class MainMenuScreen(Screen):
     def __init__(self, screen_manager):
         super().__init__(screen_manager)
         
-        self.menu_board = Board(
-            DEFAULT_BOARD_WIDTH, 
-            DEFAULT_BOARD_WIDTH, 
-            100, 
-            100, 
-            Color.WHITE, 
-            Color.YELLOW, 
-            5
-        )
+        self.title = Text("WUMPUS WORLD", "Arial", Color.WHITE, SCREEN_WIDTH // 2, 150, "center", "title")
 
-        self.play_btn = Button(
-            "Play", 
-            "Arial", 
-            DEFAULT_BUTTON_WIDTH, 
-            DEFAULT_BUTTON_HEIGHT, 
-            SCREEN_WIDTH // 2,  
-            SCREEN_HEIGHT // 2 - 50, 
-            Color.RED, 
-            Color.WHITE, 
-            "body", 
-            "center"  
-        )
+        button_y_start = SCREEN_HEIGHT // 2 - 30
+        self.play_btn = Button("Play", "Arial", 200, 50, SCREEN_WIDTH // 2, button_y_start, Color.DARK_GREEN, Color.WHITE, "body", "center")
         
-        self.quit_btn = Button(
-            "Quit", 
-            "Arial", 
-            DEFAULT_BUTTON_WIDTH, 
-            DEFAULT_BUTTON_HEIGHT, 
-            SCREEN_WIDTH // 2,  
-            SCREEN_HEIGHT // 2 + 50, 
-            Color.BLUE, 
-            Color.WHITE, 
-            "body", 
-            "center" 
-        )
+        self.quit_btn = Button("Exit", "Arial", 200, 50, SCREEN_WIDTH // 2,  button_y_start + 70, Color.DARK_RED, Color.WHITE, "body", "center")
+
+        self.bg = Image("assets/background/intro.jpg", SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0)
+        
+        self.overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.overlay.fill((0, 0, 0))
+        self.overlay.set_alpha(100)
 
     def draw(self, surface):
-        surface.fill(Color.BLACK)        
-        self.menu_board.draw(surface)
+        self.bg.draw(surface)
+        surface.blit(self.overlay, (0, 0))
+        self.title.draw(surface)
         self.play_btn.draw(surface)
         self.quit_btn.draw(surface)
 
     def update(self):
-        self.menu_board.update()
         self.play_btn.update()
         self.quit_btn.update()
 
@@ -69,4 +48,3 @@ class MainMenuScreen(Screen):
             elif self.quit_btn.is_point_inside(event.pos[0], event.pos[1]):
                 pygame.quit()
                 sys.exit()
-    
