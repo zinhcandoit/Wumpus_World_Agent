@@ -6,9 +6,12 @@ class Game:
         self.agent = Agent(num_wumpus, size)
         self.point = 0
         self.actions = []
-
-    def get_percepts(self):
-        return self.map.get_percepts_for_agent(self.agent)
+    def agent_take_percepts(self):
+        new_percepts = self.map.get_percepts_for_agent(self.agent)
+        if self.agent.percepts:
+            self.agent.percepts.extend(new_percepts)  # nối list
+        else:
+            self.agent.percepts = new_percepts
 
     def update_score(self):
         self.point = 0
