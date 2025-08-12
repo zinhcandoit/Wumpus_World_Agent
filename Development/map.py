@@ -1,7 +1,7 @@
-from definition import Literal
+from Development.definition import Literal
 import random
-from agent import Agent
-from algorithm import make_clause
+from Development.agent import Agent
+from Development.algorithm import make_clause
 class Map:
     def __init__(self, size, pit_density = 0.2, num_wumpus = 2):
         self.size = size

@@ -3,72 +3,68 @@ from Screen.BaseScreen import Screen
 from Design.UI.text import Text
 from Design.UI.slider import Slider
 from Design.UI.button import Button
-from Design.UI.board import Board
 from Design.UI.toggle import Toggle
 from Design.ImageManager.Image import Image
+from Development.gameState import Game
 from constant import *
 
 class GameScreen(Screen):
     def __init__(self, screen_manager):
         super().__init__(screen_manager)
-        
+
         self.map_size = 8
         self.pit_density = 0.2
         self.num_wumpus = 2
         self.hard_mode = False
 
-        self.side_board = Board(200, 600, 0, 0, Color.DARK_GREEN, Color.DARK_GREEN, 0) 
+        self.Game = None
+        self.is_playing = False
+
+        self.ui_panel_width = SCREEN_WIDTH // 4
+        self.ui_panel_x = SCREEN_WIDTH - self.ui_panel_width  
+        self.ui_center_x = self.ui_panel_x + self.ui_panel_width // 2
 
         # Slider list kèm label
         self.slider_list = [
             {
                 "label": "Map Size:",
-                "slider": Slider(0, 0, 200, 20, 8, 4, 12)
+                "slider": Slider(self.ui_center_x, 145, self.ui_panel_width // 3 + 20, 20, 8, 4, 12),
+                "label_pos": (self.ui_panel_x + 20, 140)
             }, 
             {
                 "label": "Pit Density:",
-                "slider": Slider(0, 0, 200, 20, 8, 0.1, 0.5)
+                "slider": Slider(self.ui_center_x, 225, self.ui_panel_width // 3 + 20, 20, 0.2, 0.1, 0.5),
+                "label_pos": (self.ui_panel_x + 20, 220)
             }, 
             {
                 "label": "Number of Wumpus:",
-                "slider": Slider(0, 0, 200, 20, 2, 1, 5)
+                "slider": Slider(self.ui_center_x, 305, self.ui_panel_width // 3 + 20, 20, 2, 1, 5),
+                "label_pos": (self.ui_panel_x + 20, 300)
             }, 
         ]
 
         # Buttons
-        self.save_config_btn = Button("Save configuration", "Arial", 200, 50, SCREEN_WIDTH // 2, 400, Color.DARK_GREEN, Color.WHITE, "body", "center")
-        self.start_btn = Button("Start", "Arial", 200, 50, SCREEN_WIDTH // 2, 600, Color.DARK_GREEN, Color.WHITE, "body", "center")
-        self.back_btn = Button("Back to menu", "Arial", 200, 50, SCREEN_WIDTH // 2, 700, Color.DARK_RED, Color.WHITE, "body", "center")
+        button_width = self.ui_panel_width - 40
+        self.start_btn = Button("Start", "Arial", button_width, 40, self.ui_center_x, 490, Color.DARK_GREEN, Color.WHITE, "body", "center")
+        self.back_btn = Button("Back to menu", "Arial", button_width, 40, self.ui_center_x, 550, Color.DARK_RED, Color.WHITE, "body", "center")
 
         self.button_list = [
-            self.save_config_btn,
             self.start_btn,
             self.back_btn
         ]
 
         # Toggle
-        self.toggle_label = Text("Hard Mode", "Arial", Color.WHITE, SCREEN_WIDTH // 2 - 150, 500, "left", "body")
-        self.toggle = Toggle(SCREEN_WIDTH // 2 + 50, 495, value=False)
+        self.toggle_label = Text("Hard Mode", "Arial", Color.WHITE, self.ui_panel_x + 20, 360, "left", "body")
+        self.toggle = Toggle(self.ui_panel_x + self.ui_panel_width - 60, 355, value=False)
 
-        self.title = Text("GAME PLAY", "Arial", Color.WHITE, SCREEN_WIDTH // 2, 150, "center", "title")
+        # Title
+        self.title = Text("Game Information", "Arial", Color.WHITE, self.ui_center_x, 50, "center", "sub_title")
+        
+        # Background
         self.bg = Image("assets/background/intro.jpg", SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0)
         self.overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.overlay.fill((0, 0, 0))
         self.overlay.set_alpha(100)
-
-        # Căn vị trí slider
-        self._arrange_ui()
-
-    def _arrange_ui(self):
-        start_y = 220
-        spacing = 60
-        center_x = SCREEN_WIDTH // 2
-
-        for i, item in enumerate(self.slider_list):
-            slider = item["slider"]
-            slider.x = center_x
-            slider.y = start_y + i * spacing
-            item["label_pos"] = (center_x - slider.w // 2 - 150, slider.y + 5)  # label bên trái
 
     def draw_bg(self, surface):
         self.bg.draw(surface)
@@ -77,50 +73,109 @@ class GameScreen(Screen):
     def draw_title(self, surface):
         self.title.draw(surface)
 
+    def draw_ui_panel_background(self, surface):
+        panel_surface = pygame.Surface((self.ui_panel_width, SCREEN_HEIGHT))
+        panel_surface.fill((0, 0, 0))
+        panel_surface.set_alpha(150)
+        surface.blit(panel_surface, (self.ui_panel_x, 0))
+
     def draw(self, surface):
         self.draw_bg(surface)
+        self.draw_ui_panel_background(surface)
         self.draw_title(surface)
 
-        # Vẽ slider + label
+        # Slider + label
         for item in self.slider_list:
             label = Text(item["label"], "Arial", Color.WHITE, item["label_pos"][0], item["label_pos"][1], "left", "body")
             label.draw(surface)
             item["slider"].draw(surface)
 
-        # Vẽ toggle
+        # Toggle
         self.toggle_label.draw(surface)
         self.toggle.draw(surface)
 
-        # Vẽ buttons
+        # Buttons
         for button in self.button_list:
             button.draw(surface)
 
+        # Vẽ map game nếu đang chơi
+        if self.is_playing and self.Game:
+            self.draw_game_map(surface)
+
+    def draw_game_map(self, surface):
+        # Định nghĩa vùng hiển thị map cố định
+        map_display_size = 400  # Kích thước hiển thị cố định của map
+        offset_x = 50
+        offset_y = 100
+        
+        # Tính cell_size dựa trên map_size thực tế để map luôn fit trong vùng cố định
+        actual_map_size = len(self.Game.map.grid)
+        cell_size = map_display_size // actual_map_size
+        
+        for r, row in enumerate(self.Game.map.grid):
+            for c, cell in enumerate(row):
+                rect = pygame.Rect(offset_x + c*cell_size, offset_y + r*cell_size, cell_size, cell_size)
+                pygame.draw.rect(surface, Color.WHITE, rect, 1)
+                
+                # Vẽ nội dung cell
+                cell_content = "".join(cell) if cell else ""
+                if cell_content:
+                    # Điều chỉnh font size dựa trên cell_size
+                    font_size = max(8, min(cell_size // 4, 12))
+                    text = Text(cell_content, "Arial", Color.WHITE, rect.centerx, rect.centery, "center", "body")
+                    text.draw(surface)
+
     def update(self):
+        if self.is_playing and self.Game:
+            self.step_game()
+
         for item in self.slider_list:
             item["slider"].update()
         self.toggle.update()
 
-    def on_enter(self):
-        pass
+    def step_game(self):
+        agent = self.Game.agent
+        agent.percepts = self.Game.map.get_percepts_for_agent(agent)
+        agent.get_KB_from_percepts()
+        action = agent.choose_action()
+        self.Game.actions.append(action)
+        self.Game.update_score()
+
+        if action == "climb out":
+            print("Agent climbed out!")
+            self.is_playing = False
+            return
+
+        flag = self.Game.map.update_map(action, agent)
+        print(f"Step {len(self.Game.actions)}: {action}")
+
+        if flag is False:
+            self.Game.actions.append("die")
+            self.Game.update_score()
+            print("Agent died!")
+            self.is_playing = False
+            return
+
+        if len(self.Game.actions) > 20:
+            print("Too many actions, stopping the game.")
+            self.is_playing = False
 
     def handle_event(self, event):
         for item in self.slider_list:
             item["slider"].handle_event(event)
-
         for button in self.button_list:
             button.handle_event(event)
-        
         self.toggle.handle_event(event)
         self.hard_mode = self.toggle.value
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  
             if self.back_btn.is_point_inside(event.pos[0], event.pos[1]):
                 self.screen_manager.set_screen("menu")
-            elif self.save_config_btn.is_point_inside(event.pos[0], event.pos[1]):
-                self.map_size = self.slider_list[0]["slider"].value
-                self.pit_density = self.slider_list[1]["slider"].value
-                self.num_wumpus = self.slider_list[2]["slider"].value
-                print(f"Saved config: map_size={self.map_size}, pit_density={self.pit_density}, num_wumpus={self.num_wumpus}, hard_mode={self.hard_mode}")
-            # elif self.start_btn.is_point_inside(event.pos[0], event.pos[1]):
-            #     self.game.map = Map(self.map_size, self.pit_density, self.num_wumpus, hard=self.hard_mode)
-            #     self.game.start_algo()
+            elif self.start_btn.is_point_inside(event.pos[0], event.pos[1]):
+                size = int(self.slider_list[0]["slider"].value)
+                pit = self.slider_list[1]["slider"].value
+                wumpus = int(self.slider_list[2]["slider"].value)
+                hard = self.toggle.value
+                self.Game = Game(size, pit, wumpus, hard)
+                self.is_playing = True
+                print("Game configuration: ", size, pit, wumpus, hard)
