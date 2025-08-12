@@ -11,7 +11,7 @@ class Agent:
         self.has_arrow = True
         self.size_known = map_size
         self.visited = set()
-        self.percepts =list[Literal] # New percepts at current location
+        self.percepts = [] # New percepts at current location
         self.KB = set()  # Agent won't know the size of the map until getting bump
     
     def update_direction(self, action):
@@ -87,6 +87,8 @@ class Agent:
                 c = make_clause(or_literals)
                 if c:
                     self.KB.add(c)
+                self.KB.add(make_clause([Literal("stench", ppos, False)]))
+                self.KB.add(make_clause([Literal("wumpus", ppos, True), Literal("pit", ppos, True)]))
 
             if percept.name == 'breeze':
                 or_literals = []
@@ -101,6 +103,8 @@ class Agent:
                 c = make_clause(or_literals)
                 if c:
                     self.KB.add(c)
+                self.KB.add(make_clause([Literal("breeze", ppos, False)]))
+                self.KB.add(make_clause([Literal("wumpus", ppos, True), Literal("pit", ppos, True)]))
 
             if percept.name == 'bump':
                 # deduce map size from bump percept position
@@ -148,9 +152,9 @@ class Agent:
     def choose_action(self, mode='random'):
         if mode == 'random':
             result = classify_all_literals(self.KB)
-            for (name, pos), status in sorted(result.items()):
+            '''for (name, pos), status in sorted(result.items()):
                 pos_str = f"({', '.join(map(str, pos))})" if pos else ""
-                print(f"{name}{pos_str}: {status}")
+                print(f"{name}{pos_str}: {status}")'''
             get_action = get_possible_actions(self, result)
             print("Possible actions:", get_action)
             if 'grab' in get_action:
