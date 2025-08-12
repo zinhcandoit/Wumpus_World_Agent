@@ -3,7 +3,7 @@ from map import Map
 class Game:
     def __init__(self, size, pit_density=0.2, num_wumpus=2):
         self.map = Map(size, pit_density, num_wumpus)
-        self.agent = Agent(num_wumpus)
+        self.agent = Agent(num_wumpus, size)
         self.point = 0
         self.actions = []
 
@@ -11,6 +11,7 @@ class Game:
         return self.map.get_percepts_for_agent(self.agent)
 
     def update_score(self):
+        self.point = 0
         for action in self.actions:
             if action == "climb out":
                 self.point += (1000 if self.agent.has_gold else 0)

@@ -1,6 +1,7 @@
 from definition import Literal
 import random
 from agent import Agent
+from algorithm import make_clause
 class Map:
     def __init__(self, size, pit_density = 0.2, num_wumpus = 2):
         self.size = size
@@ -24,7 +25,6 @@ class Map:
         grid[start_pos[0]][start_pos[1]] = {'agent', 'OK'}
         return grid
 
-
     def get_percepts_for_agent(self, agent: Agent):
         y, x = agent.location
 
@@ -33,18 +33,17 @@ class Map:
         if 'gold' in self.grid[y][x]:
             percepts.append(Literal("glitter", (y, x), False))
 
-        if self.has_adjacent(x, y, 'wumpus'):
+        if self.has_adjacent(y, x, 'wumpus'):
             percepts.append(Literal("stench", (y, x), False))
 
-        if self.has_adjacent(x, y, 'pit'):
+        if self.has_adjacent(y, x, 'pit'):
             percepts.append(Literal("breeze", (y, x), False))
-
         return percepts
     
-    def has_adjacent(self, x, y, element):
+    def has_adjacent(self, y, x, element):
         # kiểm tra 4 hướng lân cận có element không
         directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
-        for dx, dy in directions:
+        for dy, dx in directions:
             if 0 <= x + dx < self.size and 0 <= y + dy < self.size:
                 if element in self.grid[y + dy][x + dx]:
                     return True
@@ -54,21 +53,30 @@ class Map:
         # Di chuyển agent, kiểm tra chết hay nhặt vàng
         if action == "move":
             direction_moves = {'N': (-1, 0), 'S': (1, 0), 'W': (0, -1), 'E': (0, 1)}
+            old_y, old_x = agent.location
             dy, dx = direction_moves[agent.direction]
-            new_y, new_x = agent.location[0] + dy, agent.location[1] + dx
-            self.grid[agent.location[0]][agent.location[1]].discard('agent')
-            self.grid[new_y][new_x].discard('NaN')
-            self.grid[new_y][new_x].update({'agent', 'OK'})
+            new_y, new_x = old_y + dy, old_x + dx
             if not (0 <= new_y < self.size and 0 <= new_x < self.size):
                 agent.percepts.append(Literal("bump", (new_y, new_x), False))
-                agent.location = (self.size - 1 if new_y >= self.size else new_y, 
-                                  self.size - 1 if new_x >= self.size else new_x)
+                return True
+            if 'agent' in self.grid[old_y][old_x]:
+                self.grid[old_y][old_x].remove('agent')
             agent.location = (new_y, new_x)
-            if 'wumpus' or 'pit' in self.grid[new_y][new_x]:
+            self.grid[new_y][new_x].discard('NaN')
+            self.grid[new_y][new_x].add('agent')
+            self.grid[new_y][new_x].add('OK')
+            if 'wumpus' in self.grid[new_y][new_x] or 'pit' in self.grid[new_y][new_x]:
                 return False  # Agent dies
+        elif action == "turn left":
+            agent.update_direction('turn left')
+    
+        elif action == "turn right":
+            agent.update_direction('turn right')
         elif action == "grab":
             if 'gold' in self.grid[agent.location[0]][agent.location[1]]:
                 agent.has_gold = True
+                # Remove gold from KB
+                agent.KB.remove(make_clause([Literal("gold", agent.location, False)]))
                 self.grid[agent.location[0]][agent.location[1]].discard('gold')
         elif action == "shoot":
             if agent.has_arrow:
