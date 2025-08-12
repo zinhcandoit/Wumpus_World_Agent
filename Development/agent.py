@@ -152,9 +152,9 @@ class Agent:
     def choose_action(self, mode='random'):
         if mode == 'random':
             result = classify_all_literals(self.KB) 
-            for (name, pos), status in sorted(result.items()):
+            '''for (name, pos), status in sorted(result.items()):
                 pos_str = f"({', '.join(map(str, pos))})" if pos else ""
-                print(f"{name}{pos_str}: {status}")
+                print(f"{name}{pos_str}: {status}")'''
             get_action = get_possible_actions(self, result)
             print("Possible actions:", get_action)
             if 'grab' in get_action:
