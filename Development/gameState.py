@@ -1,7 +1,7 @@
 from Development.agent import Agent
 from Development.map import Map
 class Game:
-    def __init__(self, size=8, pit_density=0.2, num_wumpus=2, hard_mode=False):
+    def __init__(self, size=4, pit_density=0.2, num_wumpus=2, hard_mode=False):
         self.map = Map(size, pit_density, num_wumpus)
         self.agent = Agent(num_wumpus, size)
         self.point = 0
