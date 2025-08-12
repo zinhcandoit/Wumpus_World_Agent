@@ -25,11 +25,11 @@ def play(size, pit_density, num_wumpus):
             game.actions.append("die")
             game.update_score()
             break
-        if (len(game.actions) > 20):
+        if (len(game.actions) > 50):
             print("Too many actions, stopping the game.")
             break
     return game.point, game.actions
 
-point, action = play(4, 0.2, 2)  # Example call to play the game with a 4x4 map, 20% pit density, and 2 wumpuses
+point, action = play(4, 0, 3)  # Example call to play the game with a 4x4 map, 20% pit density, and 2 wumpuses
 print(f"Final score: {point}")
 print(f"Actions taken: {action}")

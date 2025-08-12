@@ -134,7 +134,7 @@ def classify_all_literals(KB):
 
         entails_pos = tt_entails(KB, pos_lit)
         if entails_pos:
-            result[pos_name] = "UNSAFE"
+            result[pos_name] = "UNSAFE" # (wumpus, xy, false)=> xy haswwumpus -> unsafe
             continue
         entails_neg = tt_entails(KB, neg_lit)
         if entails_neg:
@@ -179,7 +179,9 @@ def get_possible_actions(agent, cell_states:dict):
         nb = (agent.location[0] + i * dy, agent.location[1] + i * dx)
         if not (0 <= nb[0] < agent.size_known and 0 <= nb[1] < agent.size_known):
             break  # out of bounds
-        wumpus_infront = True if cell_states.get(("wumpus", front_cell), "UNKNOWN") == "UNSAFE" else False
+        if cell_states.get(("wumpus", front_cell), "UNKNOWN") == "UNSAFE":
+            wumpus_infront = True
+        else: wumpus_infront = False
     if agent.has_arrow and wumpus_infront:
         actions.append("shoot")
 
@@ -187,8 +189,7 @@ def get_possible_actions(agent, cell_states:dict):
     actions.extend(["turn left", "turn right"])
 
     # 4. grab: nếu có vàng tại vị trí hiện tại
-    if ("gold", agent.location) in cell_states and cell_states[("gold", agent.location)] == "UNSAFE" and agent.has_gold == False:
-        # Ở đây "UNSAFE" nghĩa là chắc chắn có gold
+    if cell_states.get(("gold", agent.location)) == "UNSAFE" and not agent.has_gold:
         actions.append("grab")
 
     # 5. climb out: nếu ở ô xuất phát
