@@ -19,3 +19,5 @@ class Color:
     DARK_GRAY = (50, 50, 50)
     DARK_GREEN = (0, 150, 0)
     DARK_RED = (150, 0, 0)
+    CYAN = (0, 255, 255)
+    DARK_BLUE = (0, 0, 150) 

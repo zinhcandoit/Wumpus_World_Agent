@@ -2,10 +2,18 @@ from Development.definition import Literal
 import random
 from Development.agent import Agent
 from Development.algorithm import make_clause
+from Design.ImageManager.Image import Image
 class Map:
-    def __init__(self, size, pit_density = 0.2, num_wumpus = 2):
+    def __init__(self, size = 4, pit_density = 0.2, num_wumpus = 2):
         self.size = size
         self.grid = self.generate(size, pit_density, num_wumpus)
+
+        # self.wumpus_image = Image('Images/wumpus.png', 50, 50, 0, 0)
+        # self.pit_image = Image('Images/pit.png', 50, 50, 0, 0)
+        # self.gold_image = Image('Images/gold.png', 50, 50, 0, 0)
+        # self.stench_image = Image('Images/stench.png', 50, 50, 0, 0)
+        # self.breeze_image = Image('Images/breeze.png', 50, 50, 0, 0)
+        # self.map_image = Image('Images/map.png', 500, 500, 0, 0)
 
     def generate(self, size, pit_density, num_wumpus):
         num_pits = int(size * size * pit_density)
@@ -88,10 +96,13 @@ class Map:
                     if 0 <= new_y < self.size and 0 <= new_x < self.size:
                         if 'wumpus' in self.grid[new_y][new_x]:
                             self.grid[new_y][new_x].discard('wumpus')
-                            agent.percepts.append(Literal("scream", agent.location, False))
+                            self.grid[new_y][new_x].add('NaN')
                             agent.wumpus_remain -= 1
                             break
         return True
+    
+    # def draw():
+    #     pass
 
 
              
