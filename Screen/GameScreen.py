@@ -103,27 +103,8 @@ class GameScreen(Screen):
             self.draw_game_map(surface)
 
     def draw_game_map(self, surface):
-        # Định nghĩa vùng hiển thị map cố định
-        map_display_size = 400  # Kích thước hiển thị cố định của map
-        offset_x = 50
-        offset_y = 100
-        
-        # Tính cell_size dựa trên map_size thực tế để map luôn fit trong vùng cố định
-        actual_map_size = len(self.Game.map.grid)
-        cell_size = map_display_size // actual_map_size
-        
-        for r, row in enumerate(self.Game.map.grid):
-            for c, cell in enumerate(row):
-                rect = pygame.Rect(offset_x + c*cell_size, offset_y + r*cell_size, cell_size, cell_size)
-                pygame.draw.rect(surface, Color.WHITE, rect, 1)
-                
-                # Vẽ nội dung cell
-                cell_content = "".join(cell) if cell else ""
-                if cell_content:
-                    # Điều chỉnh font size dựa trên cell_size
-                    font_size = max(8, min(cell_size // 4, 12))
-                    text = Text(cell_content, "Arial", Color.WHITE, rect.centerx, rect.centery, "center", "body")
-                    text.draw(surface)
+        if self.Game:
+            pass
 
     def update(self):
         if self.is_playing and self.Game:
