@@ -96,7 +96,7 @@ class Map:
                     if 0 <= new_y < self.size and 0 <= new_x < self.size:
                         if 'wumpus' in self.grid[new_y][new_x]:
                             self.grid[new_y][new_x].discard('wumpus')
-                            agent.percepts.append(Literal("scream", agent.location, False))
+                            self.grid[new_y][new_x].add('NaN')
                             agent.wumpus_remain -= 1
                             break
         return True

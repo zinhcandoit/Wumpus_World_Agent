@@ -9,7 +9,7 @@ class Agent:
         self.direction = 'E'
         self.has_gold = False
         self.has_arrow = True
-        self.size_known = map_size
+        self.size_known = map_size  # Initially known size of the map 
         self.visited = set()
         self.percepts = [] # New percepts at current location
         self.KB = set()  # Agent won't know the size of the map until getting bump
@@ -42,11 +42,6 @@ class Agent:
         percept_names = {p.name for p in self.percepts}
 
         # negative inferences: only when current pos valid (and in_bounds uses size_known logic)
-        if valid_current and "glitter" not in percept_names:
-            c = make_clause([Literal("gold", tuple(current_pos), True)])
-            if c:
-                self.KB.add(c)
-
         if valid_current and "stench" not in percept_names:
             for dy, dx in look_around:
                 nb = (current_pos[0] + dy, current_pos[1] + dx)
@@ -125,17 +120,22 @@ class Agent:
                     self.KB = new_KB
 
             if percept.name == 'scream':
-                direction_moves = {'N': (-1, 0), 'S': (1, 0), 'W': (0, -1), 'E': (0, 1)}
+                pass
+                #self.KB.add(make_clause([Literal('wumpus', percept.pos, True)]))
+                '''direction_moves = {'N': (-1, 0), 'S': (1, 0), 'W': (0, -1), 'E': (0, 1)}
                 dy, dx = direction_moves[self.direction]
                 i = 1
+                literal = []
                 while True:
                     nb = (self.location[0] + i * dy, self.location[1] + i * dx)
                     if not in_bounds(nb):
                         break
-                    c = make_clause([Literal("wumpus", nb, True)])
+                    # Sửa: Cook lại cái literal thành: con trước mặt, đã biết cook
+                    literal.append(Literal("wumpus", nb, True)) #Vế siu mạnh
+                    c = make_clause(literal)
                     if c:
                         self.KB.add(c)
-                    i += 1
+                    i += 1'''
 
         # Constraint: Pit and Wumpus cannot be in the same cell (¬Pit ∨ ¬Wumpus)
         if valid_current:
@@ -151,7 +151,7 @@ class Agent:
         
     def choose_action(self, mode='random'):
         if mode == 'random':
-            result = classify_all_literals(self.KB)
+            result = classify_all_literals(self.KB) 
             '''for (name, pos), status in sorted(result.items()):
                 pos_str = f"({', '.join(map(str, pos))})" if pos else ""
                 print(f"{name}{pos_str}: {status}")'''
@@ -159,7 +159,11 @@ class Agent:
             print("Possible actions:", get_action)
             if 'grab' in get_action:
                 return 'grab'
-            if 'move' in get_action:
+            if 'move' in get_action and random.random() <= 0.7:
                 return 'move'
+            if 'climb out' in get_action and self.has_gold:
+                return 'climb out'
+            if 'shoot' in get_action and self.has_arrow:
+                return 'shoot'
             return get_action.pop(random.randint(0, len(get_action) - 1))
 
