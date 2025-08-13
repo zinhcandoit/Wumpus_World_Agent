@@ -1,6 +1,8 @@
 from Development.definition import Literal
-import random
+from Design.ImageManager.Image import Image
 from Development.algorithm import get_possible_actions, classify_all_literals, make_clause
+from constant import *
+import random
 class Agent:
     def __init__(self, num_wumpus=2, map_size=None):
         self.start_location = (map_size - 1, 0)
@@ -13,6 +15,8 @@ class Agent:
         self.visited = set()
         self.percepts = [] # New percepts at current location
         self.KB = set()  # Agent won't know the size of the map until getting bump
+
+        self.agent_image = Image('assets/agent.png', 50, 50, 0, 0)
     
     def update_direction(self, action):
         directions = ['N', 'E', 'S', 'W']
@@ -167,3 +171,19 @@ class Agent:
                 return 'shoot'
             return get_action.pop(random.randint(0, len(get_action) - 1))
 
+    def draw(self, surface):
+        origin_x, origin_y = START_MAP_POS
+        map_w, map_h = START_MAP_SIZE
+        tile = max(1, min(map_w // self.size_known, map_h // self.size_known))
+
+        # cập nhật kích thước sprite cho khớp ô
+        self.agent_image.width = tile
+        self.agent_image.height = tile
+
+        # (0,0) là góc dưới-trái
+        px = origin_x + self.location[1] * tile
+        py = origin_y + (self.size_known - 1 - self.location[0]) * tile
+
+        self.agent_image.x = px
+        self.agent_image.y = py
+        self.agent_image.draw(surface)

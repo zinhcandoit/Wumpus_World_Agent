@@ -158,6 +158,9 @@ class GameScreen(Screen):
     def draw_game_map(self, surface):
         if not self.Game or not self.Game.map:
             return
+
+        self.Game.map.draw(surface)
+        self.Game.agent.draw(surface)
         
     def handle_event(self, event):
         if event.type == GAME_STEP_EVENT:
