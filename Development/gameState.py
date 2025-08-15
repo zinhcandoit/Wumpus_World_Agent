@@ -5,17 +5,16 @@ class Game:
         self.map = Map(size, pit_density, num_wumpus)
         self.agent = Agent(num_wumpus, size)
         self.point = 0
-        self.actions = []
     def agent_take_percepts(self):
         new_percepts = self.map.get_percepts_for_agent(self.agent)
         if self.agent.percepts:
-            self.agent.percepts.extend(new_percepts)  # nối list
+            self.agent.percepts.extend(new_percepts)
         else:
             self.agent.percepts = new_percepts
 
     def update_score(self):
         self.point = 0
-        for action in self.actions:
+        for action in self.agent.actions:
             if action == "climb out":
                 self.point += (1000 if self.agent.has_gold else 0)
             elif action == "turn left" or action == "turn right" or action == "move":

@@ -14,7 +14,7 @@ class Agent:
         self.size_known = map_size
         self.visited = set()
         self.percepts = [] # New percepts at current location
-        self.KB = set()  # Agent won't know the size of the map until getting bump
+        self.KB = set()
     
     def update_direction(self, action):
         directions = ['N', 'E', 'S', 'W']
