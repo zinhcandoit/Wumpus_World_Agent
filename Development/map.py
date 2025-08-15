@@ -35,17 +35,18 @@ class Map:
 
     def get_percepts_for_agent(self, agent: Agent):
         y, x = agent.location
+        at_step = len(agent.actions)
 
         percepts = []
 
         if 'gold' in self.grid[y][x]:
-            percepts.append(Literal("glitter", (y, x), False))
+            percepts.append(Literal("glitter", (y, x), False, at_step))
 
         if self.has_adjacent(y, x, 'wumpus'):
-            percepts.append(Literal("stench", (y, x), False))
+            percepts.append(Literal("stench", (y, x), False, at_step))
 
         if self.has_adjacent(y, x, 'pit'):
-            percepts.append(Literal("breeze", (y, x), False))
+            percepts.append(Literal("breeze", (y, x), False, at_step))
         return percepts
     
     def has_adjacent(self, y, x, element):
@@ -58,15 +59,13 @@ class Map:
         return False
 
     def update_map(self, action, agent: Agent):
+        at_step = len(agent.actions)
         # Di chuyển agent, kiểm tra chết hay nhặt vàng
         if action == "move":
             direction_moves = {'N': (-1, 0), 'S': (1, 0), 'W': (0, -1), 'E': (0, 1)}
             old_y, old_x = agent.location
             dy, dx = direction_moves[agent.direction]
             new_y, new_x = old_y + dy, old_x + dx
-            if not (0 <= new_y < self.size and 0 <= new_x < self.size):
-                agent.percepts.append(Literal("bump", (new_y, new_x), False))
-                return True
             if 'agent' in self.grid[old_y][old_x]:
                 self.grid[old_y][old_x].remove('agent')
             agent.location = (new_y, new_x)
@@ -84,7 +83,7 @@ class Map:
             if 'gold' in self.grid[agent.location[0]][agent.location[1]]:
                 agent.has_gold = True
                 # Remove gold from KB
-                agent.KB.remove(make_clause([Literal("gold", agent.location, False)]))
+                agent.KB.remove(make_clause([Literal("gold", agent.location, False, at_step - 1)]))
                 self.grid[agent.location[0]][agent.location[1]].discard('gold')
         elif action == "shoot":
             if agent.has_arrow:
@@ -98,7 +97,57 @@ class Map:
                             self.grid[new_y][new_x].discard('wumpus')
                             self.grid[new_y][new_x].add('NaN')
                             agent.wumpus_remain -= 1
+                            agent.percepts.append(Literal("scream", agent.wumpus_die, False, at_step))
                             break
+
+        # --- WUMPUS MOVE EVERY 5 STEPS ---
+        if at_step % 5 == 0:
+            import random
+            direction_moves = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # N, S, W, E
+
+            # 1) Lấy vị trí wumpus hiện tại
+            wumpus_positions = []
+            for y in range(self.size):
+                for x in range(self.size):
+                    if 'wumpus' in self.grid[y][x]:
+                        wumpus_positions.append((y, x))
+
+            # 2) Di chuyển từng con, tránh pit và trùng nhau
+            reserved_after_move = set()
+            for y, x in wumpus_positions:
+                dirs = direction_moves[:]
+                random.shuffle(dirs)
+                moved = False
+
+                for dy, dx in dirs:
+                    ny, nx = y + dy, x + dx
+                    if not (0 <= ny < self.size and 0 <= nx < self.size):
+                        continue
+                    # Không được trùng pit, Không được vướng lẫn nhau
+                    if 'pit' in self.grid[ny][nx]:
+                        continue
+                    if 'wumpus' in self.grid[ny][nx]:
+                        continue
+                    if (ny, nx) in reserved_after_move:
+                        continue
+
+                    # --- COMMIT MOVE ---
+                    self.grid[y][x].discard('wumpus')
+                    if ('OK' not in self.grid[y][x]):
+                        self.grid[y][x].add('NaN')
+                    self.grid[ny][nx].discard('NaN')
+                    self.grid[ny][nx].add('wumpus')
+                    moved = True
+                    # Nếu wumpus vừa tới ô có agent -> agent chết
+                    if (ny, nx) == agent.location:
+                        return False
+
+                    reserved_after_move.add((ny, nx))
+                    break
+
+                if not moved:
+                    reserved_after_move.add((y, x))
+
         return True
     
     # def draw():
