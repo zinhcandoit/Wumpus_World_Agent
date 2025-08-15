@@ -1,4 +1,5 @@
 from Development.gameState import Game
+from Development.algorithm import prune_by_radius
 def print_map(map):
     for row in map.grid:
         print(" | ".join(" ".join(cell) for cell in row))
@@ -12,6 +13,7 @@ def play(size, pit_density, num_wumpus):
     while True:
         game.agent_take_percepts()  # Agent takes percepts from the map
         game.agent.get_KB_from_percepts()
+        prune_by_radius(game.agent, 3) # Pruning KB
         action = game.agent.choose_action('random')   # We will use random agent / Logic agent for choosing action
         game.agent.actions.append(action)
         game.update_score()
@@ -29,6 +31,6 @@ def play(size, pit_density, num_wumpus):
             break
     return game.point, game.agent.actions
 
-point, action = play(4, 0.2, 2)  # Example call to play the game with a 4x4 map, 20% pit density, and 2 wumpuses
+point, action = play(6, 0.1, 2)  # Example call to play the game with a 4x4 map, 20% pit density, and 2 wumpuses
 print(f"Final score: {point}")
 print(f"Actions taken: {action}")

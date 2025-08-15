@@ -103,10 +103,34 @@ class Agent:
             c = make_clause([Literal("pit", pos, True, at_step), Literal("wumpus", pos, True, at_step)])
             if c:
                 self.KB.add(c)
+        
 
         # clear percepts
+        self.dedupe_latest_dynamic_inplace()
         self.percepts = []
-        
+
+    def dedupe_latest_dynamic_inplace(self):
+        latest_time = {}
+        for clause in list(self.KB):
+            for lit in clause:
+                if lit.name in dynamic_literal:
+                    key = (lit.name, lit.pos, lit.negate)
+                    if key not in latest_time or lit.at_step > latest_time[key]:
+                        latest_time[key] = lit.at_step
+
+        new_KB = set()
+        for clause in self.KB:
+            keep_clause = True
+            for lit in clause:
+                if lit.name in dynamic_literal:
+                    key = (lit.name, lit.pos, lit.negate)
+                    if lit.at_step < latest_time[key]:
+                        keep_clause = False
+                        break
+            if keep_clause:
+                new_KB.add(clause)
+        self.KB = new_KB
+
     def choose_action(self, mode='random'):
         if mode == 'random':
             '''# Code tĩnh cho wumpus
@@ -116,8 +140,9 @@ class Agent:
                 print(f"{name}{pos_str}: {status}")
             get_action = get_possible_actions(self, result)'''
             # Code động cho wumpus
-            current_step = len(self.actions)            
-            result = classify_all_literals_now(self.KB, current_step)
+            current_step = len(self.actions)
+            focus_pairs = build_focus_pairs_for_decision(self)          
+            result = classify_all_local(self.KB, current_step, focus_pairs)
 
             get_action = get_possible_actions_now(self, result)
             print("Possible actions:", get_action)
