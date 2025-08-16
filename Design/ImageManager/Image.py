@@ -1,7 +1,8 @@
 import pygame
+from constant import *
 
 class Image:
-    def __init__(self, link, w, h, x, y, dir=0):
+    def __init__(self, link, w=TILE_SIZE, h=TILE_SIZE, x=0, y=0, dir=0):
         self.w = w
         self.h = h
         self.x = x
