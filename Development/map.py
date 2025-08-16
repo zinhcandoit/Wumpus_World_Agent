@@ -11,6 +11,8 @@ class Map:
         self.size = size
         self.grid = self.generate(size, pit_density, num_wumpus)
         self.rebuild_percept_layers()
+
+        self.wumpus_positions = []
         
         self.ORIGIN_X, self.ORIGIN_Y = START_MAP_POS
         self.MAP_W, self.MAP_H = START_MAP_SIZE
@@ -32,6 +34,9 @@ class Map:
 
     def in_bounds(self, y, x):
         return 0 <= x < self.size and 0 <= y < self.size
+
+    def get_wumpus_actions(self):
+        return self.wumpus_pos
 
     def generate(self, size, pit_density, num_wumpus):
         num_pits = int(size * size * pit_density)
@@ -156,15 +161,15 @@ class Map:
             direction_moves = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # N, S, W, E
 
             # 1) Lấy vị trí wumpus hiện tại
-            wumpus_positions = []
+            self.wumpus_positions = []
             for y in range(self.size):
                 for x in range(self.size):
                     if 'wumpus' in self.grid[y][x]:
-                        wumpus_positions.append((y, x))
+                        self.wumpus_positions.append((y, x))
 
             # 2) Di chuyển từng con, tránh pit và trùng nhau
             reserved_after_move = set()
-            for y, x in wumpus_positions:
+            for y, x in self.wumpus_positions:
                 dirs = direction_moves[:]
                 random.shuffle(dirs)
                 moved = False
@@ -193,6 +198,7 @@ class Map:
                         return False
 
                     reserved_after_move.add((ny, nx))
+
                     break
 
                 if not moved:

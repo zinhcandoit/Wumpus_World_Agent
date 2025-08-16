@@ -17,6 +17,7 @@ class GameScreen(Screen):
         self.game_step = 0
         self.game_finished = False
         self.actions = []
+        self.wumpus_actions = []
         self.point = 0
 
         self.current_action = ""
@@ -114,13 +115,14 @@ class GameScreen(Screen):
     def solve_game(self):
         if self.Game:
             try:
-                self.point, self.actions = self.Game.play()
+                self.point, self.actions, self.wumpus_actions = self.Game.play()
             except Exception as e:
                 print("Game.play() error:", e)
-                self.point, self.actions = 0, []
+                self.point, self.actions, self.wumpus_actions = 0, [], []
 
         print("Game score: ", self.point)
         print("Game actions: ", self.actions)
+        print("Wumpus actions: ", self.wumpus_actions)
 
     def apply_visual_action(self, action):
         print("Applying action: ", action)
