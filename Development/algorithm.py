@@ -169,10 +169,11 @@ def build_focus_pairs_for_decision(agent):
     y, x = agent.location
     nbr = [(y, x+1), (y+1, x), (y, x-1), (y-1, x)]
 
-    focus = {('stench', (y, x)), ('glitter', (y, x))}
+    focus = {('stench', (y, x)), ('gold', (y, x))}
     for nb in nbr:
-        focus.add(('wumpus', nb))
-        focus.add(('pit', nb))
+        if 0 <= nb[0] < agent.size_known and 0 <= nb[1] < agent.size_known:
+            focus.add(('wumpus', nb))
+            focus.add(('pit', nb))
 
     # Mở rộng cho SHOOT (bắn xa)
     if agent.has_arrow:

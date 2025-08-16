@@ -42,17 +42,19 @@ class Agent:
         if "stench" not in percept_names:
             for dy, dx in look_around:
                 nb = (current_pos[0] + dy, current_pos[1] + dx)
-                c = make_clause([Literal("wumpus", nb, True, at_step)])
-                if c:
-                    self.KB.add(c)
+                if 0 <= nb[0] < self.size_known and 0 <= nb[0] < self.size_known:
+                    c = make_clause([Literal("wumpus", nb, True, at_step)])
+                    if c:
+                        self.KB.add(c)
             self.KB.add(make_clause([Literal("stench", tuple(current_pos), True, at_step)]))
 
         if "breeze" not in percept_names:
             for dy, dx in look_around:
                 nb = (current_pos[0] + dy, current_pos[1] + dx)
-                c = make_clause([Literal("pit", nb, True, at_step)])
-                if c:
-                    self.KB.add(c)
+                if 0 <= nb[0] < self.size_known and 0 <= nb[0] < self.size_known:
+                    c = make_clause([Literal("pit", nb, True, at_step)])
+                    if c:
+                        self.KB.add(c)
             self.KB.add(make_clause([Literal("breeze", tuple(current_pos), True, at_step)]))
 
         # process each percept
@@ -68,10 +70,11 @@ class Agent:
                 or_literals = []
                 for dy, dx in look_around:
                     nb = (ppos[0] + dy, ppos[1] + dx)
-                    or_literals.append(Literal("wumpus", nb, False, at_step))
-                    impl = make_clause([Literal("wumpus", nb, True, at_step), Literal("stench", ppos, False, at_step)])
-                    if impl:
-                        self.KB.add(impl)
+                    if 0 <= nb[0] < self.size_known and 0 <= nb[0] < self.size_known: 
+                        or_literals.append(Literal("wumpus", nb, False, at_step))
+                        impl = make_clause([Literal("wumpus", nb, True, at_step), Literal("stench", ppos, False, at_step)])
+                        if impl:
+                            self.KB.add(impl)
                 # add the stench literal itself
                 or_literals.append(Literal("stench", ppos, True, at_step))
                 c = make_clause(or_literals)
@@ -84,10 +87,11 @@ class Agent:
                 or_literals = []
                 for dy, dx in look_around:
                     nb = (ppos[0] + dy, ppos[1] + dx)
-                    or_literals.append(Literal("pit", nb, False, at_step))
-                    impl = make_clause([Literal("pit", nb, True, at_step), Literal("breeze", ppos, False, at_step)])
-                    if impl:
-                        self.KB.add(impl)
+                    if 0 <= nb[0] < self.size_known and 0 <= nb[0] < self.size_known: 
+                        or_literals.append(Literal("pit", nb, False, at_step))
+                        impl = make_clause([Literal("pit", nb, True, at_step), Literal("breeze", ppos, False, at_step)])
+                        if impl:
+                            self.KB.add(impl)
                 or_literals.append(Literal("breeze", ppos, True, at_step))
                 c = make_clause(or_literals)
                 if c:
@@ -104,9 +108,10 @@ class Agent:
         # Constraint: Pit and Wumpus cannot be in the same cell (¬Pit ∨ ¬Wumpus)
         for dy, dx in look_around:
             pos = (current_pos[0] + dy, current_pos[1] + dx)
-            c = make_clause([Literal("pit", pos, True, at_step), Literal("wumpus", pos, True, at_step)])
-            if c:
-                self.KB.add(c)
+            if 0 <= pos[0] < self.size_known and 0 <= pos[1] <self.size_known:
+                c = make_clause([Literal("pit", pos, True, at_step), Literal("wumpus", pos, True, at_step)])
+                if c:
+                    self.KB.add(c)
         
 
         # clear percepts
@@ -147,6 +152,9 @@ class Agent:
             current_step = len(self.actions)
             focus_pairs = build_focus_pairs_for_decision(self)          
             result = classify_all_local(self.KB, current_step, focus_pairs)
+            for (name, pos), status in sorted(result.items()):
+                pos_str = f"({', '.join(map(str, pos))})" if pos else ""
+                print(f"{name}{pos_str}: {status}")
 
             get_action = get_possible_actions_now(self, result)
             print("Possible actions:", get_action)
@@ -166,8 +174,7 @@ class Agent:
         tile = max(1, min(map_w // self.size_known, map_h // self.size_known))
 
         # cập nhật kích thước sprite cho khớp ô
-        self.agent_image.width = tile
-        self.agent_image.height = tile
+        self.agent_image.reset_size(tile, tile)
 
         # (0,0) là góc dưới-trái
         px = origin_x + self.location[1] * tile

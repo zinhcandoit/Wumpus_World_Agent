@@ -16,6 +16,8 @@ class Image:
     def draw(self, surface):
         surface.blit(self.image, (self.x, self.y))
 
+    def reset_size(self, w, h):
+        self.image = pygame.transform.scale(self.image, (w, h))
 
 class ImageSprite:
     def __init__(self, link, w, h, x, y, frame_count=3, dir=0):

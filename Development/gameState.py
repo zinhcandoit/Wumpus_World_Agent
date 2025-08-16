@@ -52,6 +52,7 @@ class Game:
             if (len(self.agent.actions) > 30):
                 print("Too many actions, stopping the self.")
                 break
+            
         return self.point, self.agent.actions, self.wumpus_actions
 
     def pause(self):
