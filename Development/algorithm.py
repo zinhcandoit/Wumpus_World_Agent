@@ -18,7 +18,7 @@ def _var_key(lit):
         return (lit.name, lit.pos, lit.at_step)
     return (lit.name, lit.pos)
 
-def prune_by_radius(agent, R=3, keep_static=True):
+'''def prune_by_radius(agent, R=3, keep_static=True):
     ay, ax = agent.location
 
     def near(pos):
@@ -36,7 +36,7 @@ def prune_by_radius(agent, R=3, keep_static=True):
         if any(near(lit.pos) for lit in clause):
             new_KB.add(clause)
 
-    agent.KB = new_KB
+    agent.KB = new_KB'''
 
 def _symbols_from_KB(KB):
     """Return ordered list of propositional symbols as tuples (name,pos)."""
@@ -168,11 +168,14 @@ def tt_entails(KB, alpha_literal):
 def build_focus_pairs_for_decision(agent):
     y, x = agent.location
     nbr = [(y, x+1), (y+1, x), (y, x-1), (y-1, x)]
-
-    focus = {('stench', (y, x)), ('gold', (y, x))}
+    focus = set()
+    if agent.has_gold == False:
+        focus.add(('gold', (y,x)))
     for nb in nbr:
         if 0 <= nb[0] < agent.size_known and 0 <= nb[1] < agent.size_known:
             focus.add(('wumpus', nb))
+            focus.add(('stench', nb))
+            focus.add(('breeze', nb))
             focus.add(('pit', nb))
 
     # Mở rộng cho SHOOT (bắn xa)
@@ -238,8 +241,15 @@ def get_possible_actions_now(agent, status_map):
     if 0 <= front_cell[0] < agent.size_known and 0 <= front_cell[1] < agent.size_known:
         pit_state = status_map.get(("pit", front_cell), "UNKNOWN")
         wumpus_state = status_map.get(("wumpus", front_cell), "UNKNOWN")
-        if pit_state != "UNSAFE" and wumpus_state != "UNSAFE":
-            actions.append("move")
+        stench_here  = status_map.get(("stench", agent.location), "UNKNOWN") == "UNSAFE"
+        if stench_here:
+            # có mùi -> CHỈ move nếu ô trước mặt chắc chắn an toàn
+            if pit_state == "SAFE" and wumpus_state == "SAFE":
+                actions.append("move")
+        else:
+            # không mùi -> cho move nếu không bị đánh dấu UNSAFE
+            if pit_state != "UNSAFE" and wumpus_state != "UNSAFE":
+                actions.append("move")
     
     wumpus_infront = False
     for i in range(1, agent.size_known):
