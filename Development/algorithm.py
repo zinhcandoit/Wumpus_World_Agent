@@ -1,3 +1,7 @@
+from Development.definition import Literal
+# Cause wumpus can move!
+dynamic_literal = {'wumpus', 'stench'}
+
 def make_clause(literals):
             """Canonicalize clause -> frozenset; drop tautologies (A and ¬A)."""
             s = set(literals)
@@ -7,19 +11,46 @@ def make_clause(literals):
                 if len(negs) > 1:
                     return None
             return frozenset(s)
+
+def _var_key(lit):
+    # Add step count to dynamic variable
+    if lit.name in dynamic_literal:
+        return (lit.name, lit.pos, lit.at_step)
+    return (lit.name, lit.pos)
+
+def prune_by_radius(agent, R=3, keep_static=True):
+    ay, ax = agent.location
+
+    def near(pos):
+        return abs(pos[0] - ay) + abs(pos[1] - ax) <= R
+
+    new_KB = set()
+    for clause in agent.KB:
+        # clause toàn literal tĩnh?
+        all_static = all(lit.name not in dynamic_literal for lit in clause)
+        if keep_static and all_static:
+            new_KB.add(clause)
+            continue
+
+        # giữ nếu có literal nào ở gần
+        if any(near(lit.pos) for lit in clause):
+            new_KB.add(clause)
+
+    agent.KB = new_KB
+
 def _symbols_from_KB(KB):
     """Return ordered list of propositional symbols as tuples (name,pos)."""
     vars_set = set()
     for clause in KB:
         for lit in clause:
-            vars_set.add((lit.name, lit.pos))
+            vars_set.add(_var_key(lit))
     # deterministic order
-    return sorted(vars_set, key=lambda t: (t[0], t[1]))
+    return sorted(vars_set, key=lambda t: (t[0], t[1], t[2] if len(t) > 2 else -1))
 
 def _pl_true_literal(literal, model):
     """Evaluate a literal under (complete) model dict var->bool."""
-    var = (literal.name, literal.pos)
-    val = model.get(var, False)  # if not present, default False (but should be complete)
+    var = _var_key(literal)
+    val = model.get(var, False)  # if not present, default False
     return (not literal.negate and val) or (literal.negate and not val)
 
 
@@ -33,7 +64,7 @@ def _clause_status_under_partial(clause, model):
     """
     any_unassigned = False
     for lit in clause:
-        var = (lit.name, lit.pos)
+        var = _var_key(lit)
         if var in model:
             val = model[var]
             lit_true = (not lit.negate and val) or (lit.negate and not val)
@@ -103,98 +134,122 @@ def tt_entails(KB, alpha_literal):
     """
     symbols = _symbols_from_KB(KB)
     # ensure alpha's variable in symbols list (if not, add it)
-    alpha_var = (alpha_literal.name, alpha_literal.pos)
+    alpha_var = _var_key(alpha_literal)
     if alpha_var not in symbols:
         symbols = symbols + [alpha_var]
     return _tt_check_all(KB, alpha_literal, symbols, {})
 
-
-def classify_all_literals(KB):
-    """
-    For every var (name,pos) in KB, determine:
-      - "UNSAFE" if KB |= (name,pos)  (i.e. entails positive literal)
-      - "SAFE"   if KB |= ¬(name,pos)
-      - "UNKNOWN" otherwise
-    Returns dict mapping (name,pos) -> state.
-    """
+'''def classify_all_literals_now(KB, current_step):
     result = {}
-    symbols = _symbols_from_KB(KB)
-    # pick a Literal class from KB to construct new Literal objects
     if not KB:
         return result
     sample_lit = next(iter(next(iter(KB))))
     LitType = type(sample_lit)
 
-    for var in symbols:
-        name, pos = var
+    vars_set = set((lit.name, lit.pos) for clause in KB for lit in clause)
+
+    for name, pos in sorted(vars_set, key=lambda t: (t[0], t[1])):
         pos = tuple(pos)
-        pos_name = (name, pos)
-        pos_lit = LitType(name, pos, False)
-        neg_lit = LitType(name, pos, True)
-
-        entails_pos = tt_entails(KB, pos_lit)
-        if entails_pos:
-            result[pos_name] = "UNSAFE" # (wumpus, xy, false)=> xy haswwumpus -> unsafe
-            continue
-        entails_neg = tt_entails(KB, neg_lit)
-        if entails_neg:
-            result[pos_name] = "SAFE"
+        if name in dynamic_literal:
+            pos_lit = LitType(name, pos, False, current_step)
+            neg_lit = LitType(name, pos, True,  current_step)
         else:
-            result[pos_name] = "UNKNOWN"
-    return result
-def get_possible_actions(agent, cell_states:dict):
-    """
-    Xác định danh sách hành động có thể làm dựa trên trạng thái agent và thông tin safe/unsafe.
-    
-    Parameters:
-    - agent: object có các thuộc tính:
-        location (tuple): (y,x) hiện tại
-        direction (str): 'N', 'S', 'E', 'W'
-        has_gold (bool)
-        has_arrow (bool)
-        start_location (tuple)
-    - cell_states: dict {("pit",(y,x)): "SAFE"/"UNSAFE"/"UNKNOWN", ("wumpus",(y,x)): ...}
+            pos_lit = LitType(name, pos, False)
+            neg_lit = LitType(name, pos, True)
 
-    Returns:
-    - List[str]: danh sách hành động có thể làm
+        if tt_entails(KB, pos_lit):
+            result[(name, pos)] = "UNSAFE"
+        elif tt_entails(KB, neg_lit):
+            result[(name, pos)] = "SAFE"
+        else:
+            result[(name, pos)] = "UNKNOWN"
+    return result'''
+
+def build_focus_pairs_for_decision(agent):
+    y, x = agent.location
+    nbr = [(y, x+1), (y+1, x), (y, x-1), (y-1, x)]
+
+    focus = {('stench', (y, x)), ('glitter', (y, x))}
+    for nb in nbr:
+        focus.add(('wumpus', nb))
+        focus.add(('pit', nb))
+
+    # Mở rộng cho SHOOT (bắn xa)
+    if agent.has_arrow:
+        # 1) nếu đã có dự đoán trước
+        if getattr(agent, 'wumpus_die', None) is not None:
+            focus.add(('wumpus', tuple(agent.wumpus_die)))
+
+        # 2) thêm ray theo hướng hiện tại
+        direction_moves = {'N': (-1, 0), 'S': (1, 0), 'W': (0, -1), 'E': (0, 1)}
+        dy, dx = direction_moves[agent.direction]
+        y, x = agent.location
+        for i in range(1, agent.size_known):
+            cell = (y + i*dy, x + i*dx)
+            if not (0 <= cell[0] < agent.size_known and 0 <= cell[1] < agent.size_known):
+                break
+            focus.add(('wumpus', cell))
+    return focus
+
+def classify_all_local(KB, current_step, focus_pairs):
     """
+    Chỉ entail trên các (name,pos) trong focus_pairs.
+    Trả về {(name,pos): 'SAFE'|'UNSAFE'|'UNKNOWN'}.
+    """
+    if not KB:
+        return {k: "UNKNOWN" for k in focus_pairs}
+
+    sample_lit = next(iter(next(iter(KB))))
+    Lit = type(sample_lit)
+
+    out = {}
+    for (name, pos) in focus_pairs:
+        pos = tuple(pos)
+        if name in dynamic_literal:
+            pos_lit = Lit(name, pos, False, current_step)
+            neg_lit = Lit(name, pos, True,  current_step)
+        else:
+            pos_lit = Lit(name, pos, False)
+            neg_lit = Lit(name, pos, True)
+
+        if tt_entails(KB, pos_lit):
+            out[(name, pos)] = "UNSAFE"
+        elif tt_entails(KB, neg_lit):
+            out[(name, pos)] = "SAFE"
+        else:
+            out[(name, pos)] = "UNKNOWN"
+    return out
+
+def get_possible_actions_now(agent, status_map):
     actions = []
-
-    # Bảng vector di chuyển
     direction_moves = {'N': (-1, 0), 'S': (1, 0), 'W': (0, -1), 'E': (0, 1)}
 
-    # 2. move: chỉ nếu ô trước mặt là SAFE
+    if status_map.get(("gold", agent.location)) == "UNSAFE" and not agent.has_gold:
+        actions.append("grab")
+
+    if agent.location == agent.start_location:
+        actions.append("climb out")
+    
+    actions.extend(["turn left", "turn right"])
+
     dy, dx = direction_moves[agent.direction]
     front_cell = (agent.location[0] + dy, agent.location[1] + dx)
     if 0 <= front_cell[0] < agent.size_known and 0 <= front_cell[1] < agent.size_known:
-        pit_state = cell_states.get(("pit", front_cell), "UNKNOWN")
-        wumpus_state = cell_states.get(("wumpus", front_cell), "UNKNOWN")
+        pit_state = status_map.get(("pit", front_cell), "UNKNOWN")
+        wumpus_state = status_map.get(("wumpus", front_cell), "UNKNOWN")
         if pit_state != "UNSAFE" and wumpus_state != "UNSAFE":
             actions.append("move")
-
-    # 2. shoot: nếu chắc chắn có wumpus trước mặt và còn tên
-    # Kiểm tra: Cập nhật facing có xảy ra trước không?
+    
     wumpus_infront = False
     for i in range(1, agent.size_known):
         nb = (agent.location[0] + i * dy, agent.location[1] + i * dx)
         if not (0 <= nb[0] < agent.size_known and 0 <= nb[1] < agent.size_known):
             break  # out of bounds
-        if cell_states.get(("wumpus", front_cell), "UNKNOWN") == "UNSAFE":
+        if status_map.get(("wumpus", front_cell), "UNKNOWN") == "UNSAFE":
             wumpus_infront = True
+            agent.wumpus_die = front_cell
         else: wumpus_infront = False
     if agent.has_arrow and wumpus_infront:
         actions.append("shoot")
 
-    # 3. turn left / turn right: luôn hợp lệ
-    actions.extend(["turn left", "turn right"])
-
-    # 4. grab: nếu có vàng tại vị trí hiện tại
-    if cell_states.get(("gold", agent.location)) == "UNSAFE" and not agent.has_gold:
-        actions.append("grab")
-
-    # 5. climb out: nếu ở ô xuất phát
-    if agent.location == agent.start_location:
-        actions.append("climb out")
-
     return actions
-
