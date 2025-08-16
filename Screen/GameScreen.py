@@ -88,7 +88,6 @@ class GameScreen(Screen):
         self.agent_images = {}
 
     def create_rotated_agent_images(self, cell_size):
-        """Tạo hình ảnh agent quay theo các hướng khác nhau"""
         if cell_size not in self.agent_images:
             base_img = pygame.transform.smoothscale(self.agent_image.image, (cell_size, cell_size))
             self.agent_images[cell_size] = {
@@ -111,85 +110,7 @@ class GameScreen(Screen):
         panel_surface.set_alpha(150)
         surface.blit(panel_surface, (self.ui_panel_x, 0))
 
-    def draw_actions_sequence(self, surface):
-        """Vẽ danh sách actions với highlight action hiện tại"""
-        if not self.game_finished or not self.solved_actions:
-            return
-
-        self.actions_title.draw(surface)
-        
-        # Hiển thị action hiện tại
-        if self.is_animating and self.animation_index < len(self.solved_actions):
-            current_action = self.solved_actions[self.animation_index]
-            self.current_action_text.text = f"Step {self.animation_index + 1}: {current_action}"
-        else:
-            self.current_action_text.text = "Animation completed" if self.animation_index >= len(self.solved_actions) else ""
-        
-        self.current_action_text.draw(surface)
-        
-        # Vẽ danh sách actions với highlight
-        actions_area_y = 700
-        actions_area_height = SCREEN_HEIGHT - actions_area_y - 20
-        
-        if actions_area_height > 0:
-            # Background cho actions area
-            actions_bg = pygame.Surface((self.ui_panel_width - 40, actions_area_height))
-            actions_bg.fill((20, 20, 20))
-            actions_bg.set_alpha(180)
-            surface.blit(actions_bg, (self.ui_panel_x + 20, actions_area_y))
-            
-            # Tính toán scroll
-            total_actions = len(self.solved_actions)
-            visible_actions = min(self.max_actions_display, int(actions_area_height // self.action_line_height))
-            
-            # Auto scroll to current action
-            if self.is_animating and self.animation_index < total_actions:
-                self.actions_scroll_y = max(0, min(self.animation_index - visible_actions // 2, 
-                                                 total_actions - visible_actions))
-            
-            start_index = max(0, min(self.actions_scroll_y, total_actions - visible_actions))
-            end_index = min(total_actions, start_index + visible_actions)
-            
-            # Vẽ từng action
-            for i in range(start_index, end_index):
-                action = self.solved_actions[i]
-                y_pos = actions_area_y + 10 + (i - start_index) * self.action_line_height
-                
-                # Highlight action hiện tại
-                is_current = (self.is_animating and i == self.animation_index)
-                is_completed = (i < self.animation_index)
-                
-                # Màu nền cho action hiện tại
-                if is_current:
-                    highlight_bg = pygame.Surface((self.ui_panel_width - 50, self.action_line_height - 2))
-                    highlight_bg.fill((100, 100, 0))
-                    highlight_bg.set_alpha(100)
-                    surface.blit(highlight_bg, (self.ui_panel_x + 25, y_pos - 2))
-                
-                # Đánh số thứ tự và action
-                action_text = f"{i+1:2d}. {action}"
-                
-                # Màu sắc
-                if is_current:
-                    color = Color.YELLOW
-                elif is_completed:
-                    color = Color.GREEN
-                elif "move" in action.lower():
-                    color = Color.LIGHT_BLUE
-                elif "shoot" in action.lower():
-                    color = Color.RED
-                elif "grab" in action.lower():
-                    color = Color.YELLOW
-                elif "climb" in action.lower():
-                    color = Color.GREEN
-                else:
-                    color = Color.WHITE
-                
-                action_display = Text(action_text, "Arial", color, self.ui_panel_x + 30, y_pos, "left", "small")
-                action_display.draw(surface)
-
     def draw_animation_controls(self, surface):
-        """Vẽ các nút điều khiển animation"""
         if self.game_finished and self.solved_actions:
             if not self.is_animating:
                 self.play_btn.draw(surface)
@@ -232,11 +153,7 @@ class GameScreen(Screen):
         self.start_btn.draw(surface)
         self.back_btn.draw(surface)
 
-        # Animation controls
         self.draw_animation_controls(surface)
-        
-        # Actions list
-        self.draw_actions_sequence(surface)
 
         if self.Game:
             self.draw_game_map(surface)
@@ -306,14 +223,12 @@ class GameScreen(Screen):
                 self.reset_to_initial_state()
 
     def pause_animation(self):
-        """Tạm dừng/tiếp tục animation"""
         if self.is_animating:
             self.animation_paused = not self.animation_paused
             if not self.animation_paused:
                 self.animation_timer = pygame.time.get_ticks()
 
     def reset_animation(self):
-        """Reset animation về đầu"""
         self.is_animating = False
         self.animation_paused = False
         self.animation_index = 0
@@ -321,22 +236,17 @@ class GameScreen(Screen):
         if self.Game:
             size = len(self.Game.map.grid) if hasattr(self.Game, "map") else 8
             self.agent_position = (size - 1, 0)
-            self.agent_direction = "right"  # Bắt đầu hướng về phải
+            self.agent_direction = "right"  
 
     def reset_to_initial_state(self):
-        """Reset game state về trạng thái ban đầu"""
         if not self.Game:
             return
         
         size = len(self.Game.map.grid)
-        self.agent_position = (size - 1, 0)  # Bottom-left corner
-        self.agent_direction = "right"  # Hướng ban đầu
-        
-        # Reset lại các thay đổi trong grid (ví dụ: gold đã lấy, wumpus đã chết)
-        # Điều này phụ thuộc vào cách game state được lưu trữ
-
+        self.agent_position = (size - 1, 0)  
+        self.agent_direction = "right"  
+    
     def update_animation(self):
-        """Cập nhật animation"""
         if not self.is_animating or self.animation_paused:
             return
         
@@ -353,17 +263,14 @@ class GameScreen(Screen):
                 self.is_animating = False
 
     def execute_animation_step(self):
-        """Thực hiện một bước animation"""
         if self.animation_index >= len(self.solved_actions):
             return
         
         action = self.solved_actions[self.animation_index]
         action_lower = action.lower().strip()
         
-        # Cập nhật vị trí và hướng của agent
         row, col = self.agent_position
         
-        # Xử lý action "move" dựa trên hướng hiện tại
         if action_lower == "move":
             if self.agent_direction == "up":
                 self.agent_position = (max(0, row - 1), col)
@@ -374,7 +281,6 @@ class GameScreen(Screen):
             elif self.agent_direction == "right":
                 self.agent_position = (row, min(len(self.Game.map.grid[0]) - 1, col + 1))
         
-        # Xử lý các action turn
         elif "turn left" in action_lower:
             direction_map = {"right": "up", "up": "left", "left": "down", "down": "right"}
             self.agent_direction = direction_map.get(self.agent_direction, self.agent_direction)
@@ -383,10 +289,7 @@ class GameScreen(Screen):
             direction_map = {"right": "down", "down": "left", "left": "up", "up": "right"}
             self.agent_direction = direction_map.get(self.agent_direction, self.agent_direction)
         
-        # Xử lý các action khác (grab, shoot, climb, die) - không thay đổi vị trí
-        # nhưng có thể thêm hiệu ứng visual nếu cần
-        
-        print(f"Animation step {self.animation_index + 1}: {action} -> Position: {self.agent_position}, Direction: {self.agent_direction}")
+        # print(f"Animation step {self.animation_index + 1}: {action} -> Position: {self.agent_position}, Direction: {self.agent_direction}")
 
     def update(self):
         for item in self.slider_list:
