@@ -6,8 +6,6 @@ class Game:
         self.map = Map(size, pit_density, num_wumpus)
         self.agent = Agent(num_wumpus, size)
         self.point = 0
-        self.agent.actions = []
-        self.wumpus_actions = []
 
     def agent_take_percepts(self):
         new_percepts = self.map.get_percepts_for_agent(self.agent)
@@ -50,7 +48,8 @@ class Game:
             if (len(self.agent.actions) > 30):
                 print("Too many actions, stopping the self.")
                 break
-        return self.point, self.agent.actions
+
+        return self.point, self.agent.actions, self.map.get_wumpus_movement_history()
 
     def pause(self):
         pass
