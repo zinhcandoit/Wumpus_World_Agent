@@ -24,3 +24,6 @@ class Color:
     DARK_RED = (150, 0, 0)
     CYAN = (0, 255, 255)
     DARK_BLUE = (0, 0, 150) 
+    ORANGE = (255, 165, 0)
+    GRAY = (128, 128, 128)
+    LIME = (0, 255, 0)
