@@ -36,15 +36,13 @@ class Game:
             self.agent.get_KB_from_percepts()
             prune_by_radius(self.agent, 3) # Pruning KB
             action = self.agent.choose_action('random')   # We will use random agent / Logic agent for choosing action
-
-            self.wumpus_actions = []
-
             self.agent.actions.append(action)
             self.update_score()
             if action == "climb out":
                 break
             flag = self.map.update_map(action, self.agent)
             print('Iter', len(self.agent.actions), 'Action:', action)
+            # print_map(self.map)
             if flag == False:
                 self.agent.actions.append("die")
                 self.update_score()
@@ -52,8 +50,7 @@ class Game:
             if (len(self.agent.actions) > 30):
                 print("Too many actions, stopping the self.")
                 break
-            
-        return self.point, self.agent.actions, self.wumpus_actions
+        return self.point, self.agent.actions
 
     def pause(self):
         pass

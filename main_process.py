@@ -21,7 +21,7 @@ def play(size, pit_density, num_wumpus):
             break
         flag = game.map.update_map(action, game.agent)
         print('Iter', len(game.agent.actions), 'Action:', action)
-        print_map(game.map)
+        # print_map(game.map)
         if flag == False:
             game.agent.actions.append("die")
             game.update_score()

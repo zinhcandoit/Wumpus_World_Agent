@@ -1,8 +1,6 @@
 from Development.definition import Literal
-from Design.ImageManager.Image import Image
-from Development.algorithm import *
-from constant import *
 import random
+from Development.algorithm import *
 class Agent:
     def __init__(self, num_wumpus=2, map_size=None):
         self.start_location = (map_size - 1, 0)
@@ -17,8 +15,6 @@ class Agent:
         self.visited = set()
         self.percepts = [] # New percepts at current location
         self.KB = set()
-
-        self.agent_image = Image('assets/agent.png', 50, 50, 0, 0)
     
     def update_direction(self, action):
         directions = ['N', 'E', 'S', 'W']
@@ -152,9 +148,9 @@ class Agent:
             current_step = len(self.actions)
             focus_pairs = build_focus_pairs_for_decision(self)          
             result = classify_all_local(self.KB, current_step, focus_pairs)
-            for (name, pos), status in sorted(result.items()):
-                pos_str = f"({', '.join(map(str, pos))})" if pos else ""
-                print(f"{name}{pos_str}: {status}")
+            # for (name, pos), status in sorted(result.items()):
+            #     pos_str = f"({', '.join(map(str, pos))})" if pos else ""
+            #     print(f"{name}{pos_str}: {status}")
 
             get_action = get_possible_actions_now(self, result)
             print("Possible actions:", get_action)
@@ -167,19 +163,3 @@ class Agent:
             if 'shoot' in get_action and self.has_arrow:
                 return 'shoot'
             return get_action.pop(random.randint(0, len(get_action) - 1)) 
-
-    def draw(self, surface):
-        origin_x, origin_y = START_MAP_POS
-        map_w, map_h = START_MAP_SIZE
-        tile = max(1, min(map_w // self.size_known, map_h // self.size_known))
-
-        # cập nhật kích thước sprite cho khớp ô
-        self.agent_image.reset_size(tile, tile)
-
-        # (0,0) là góc dưới-trái
-        px = origin_x + self.location[1] * tile
-        py = origin_y + (self.size_known - 1 - self.location[0]) * tile
-
-        self.agent_image.x = px
-        self.agent_image.y = py
-        self.agent_image.draw(surface)
