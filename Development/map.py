@@ -60,46 +60,6 @@ class Map:
 
     def update_map(self, action, agent: Agent):
         at_step = len(agent.actions)
-        # Di chuyển agent, kiểm tra chết hay nhặt vàng
-        if action == "move":
-            direction_moves = {'N': (-1, 0), 'S': (1, 0), 'W': (0, -1), 'E': (0, 1)}
-            old_y, old_x = agent.location
-            dy, dx = direction_moves[agent.direction]
-            new_y, new_x = old_y + dy, old_x + dx
-            if 'agent' in self.grid[old_y][old_x]:
-                self.grid[old_y][old_x].remove('agent')
-            agent.location = (new_y, new_x)
-            self.grid[new_y][new_x].discard('NaN')
-            self.grid[new_y][new_x].add('agent')
-            self.grid[new_y][new_x].add('OK')
-            if 'wumpus' in self.grid[new_y][new_x] or 'pit' in self.grid[new_y][new_x]:
-                return False  # Agent dies
-        elif action == "turn left":
-            agent.update_direction('turn left')
-    
-        elif action == "turn right":
-            agent.update_direction('turn right')
-        elif action == "grab":
-            if 'gold' in self.grid[agent.location[0]][agent.location[1]]:
-                agent.has_gold = True
-                # Remove gold from KB
-                agent.KB.remove(make_clause([Literal("gold", agent.location, False, at_step - 1)]))
-                self.grid[agent.location[0]][agent.location[1]].discard('gold')
-        elif action == "shoot":
-            if agent.has_arrow:
-                agent.has_arrow = False
-                direction_moves = {'N': (-1, 0), 'S': (1, 0), 'W': (0, -1), 'E': (0, 1)}
-                dy, dx = direction_moves[agent.direction]
-                for i in range(1, self.size):
-                    new_y, new_x = agent.location[0] + i * dy, agent.location[1] + i * dx
-                    if 0 <= new_y < self.size and 0 <= new_x < self.size:
-                        if 'wumpus' in self.grid[new_y][new_x]:
-                            self.grid[new_y][new_x].discard('wumpus')
-                            self.grid[new_y][new_x].add('NaN')
-                            agent.wumpus_remain -= 1
-                            agent.percepts.append(Literal("scream", agent.wumpus_die, False, at_step))
-                            break
-
         # --- WUMPUS MOVE EVERY 5 STEPS ---
         if at_step % 5 == 0:
             import random
@@ -147,6 +107,45 @@ class Map:
 
                 if not moved:
                     reserved_after_move.add((y, x))
+        # Di chuyển agent, kiểm tra chết hay nhặt vàng
+        if action == "move":
+            direction_moves = {'N': (-1, 0), 'S': (1, 0), 'W': (0, -1), 'E': (0, 1)}
+            old_y, old_x = agent.location
+            dy, dx = direction_moves[agent.direction]
+            new_y, new_x = old_y + dy, old_x + dx
+            if 'agent' in self.grid[old_y][old_x]:
+                self.grid[old_y][old_x].remove('agent')
+            agent.location = (new_y, new_x)
+            self.grid[new_y][new_x].discard('NaN')
+            self.grid[new_y][new_x].add('agent')
+            self.grid[new_y][new_x].add('OK')
+            if 'wumpus' in self.grid[new_y][new_x] or 'pit' in self.grid[new_y][new_x]:
+                return False  # Agent dies
+        elif action == "turn left":
+            agent.update_direction('turn left')
+    
+        elif action == "turn right":
+            agent.update_direction('turn right')
+        elif action == "grab":
+            if 'gold' in self.grid[agent.location[0]][agent.location[1]]:
+                agent.has_gold = True
+                # Remove gold from KB
+                agent.KB.remove(make_clause([Literal("gold", agent.location, False, at_step - 1)]))
+                self.grid[agent.location[0]][agent.location[1]].discard('gold')
+        elif action == "shoot":
+            if agent.has_arrow:
+                agent.has_arrow = False
+                direction_moves = {'N': (-1, 0), 'S': (1, 0), 'W': (0, -1), 'E': (0, 1)}
+                dy, dx = direction_moves[agent.direction]
+                for i in range(1, self.size):
+                    new_y, new_x = agent.location[0] + i * dy, agent.location[1] + i * dx
+                    if 0 <= new_y < self.size and 0 <= new_x < self.size:
+                        if 'wumpus' in self.grid[new_y][new_x]:
+                            self.grid[new_y][new_x].discard('wumpus')
+                            self.grid[new_y][new_x].add('NaN')
+                            agent.wumpus_remain -= 1
+                            agent.percepts.append(Literal("scream", agent.wumpus_die, False, at_step))
+                            break
 
         return True
     

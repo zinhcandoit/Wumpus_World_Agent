@@ -2,22 +2,22 @@ from Development.definition import Literal
 import random
 from Development.algorithm import *
 class Agent:
-    def __init__(self, num_wumpus=2, map_size=None):
+    def __init__(self, num_w=2, map_size=None):
         self.start_location = (map_size - 1, 0)
         self.location = (map_size - 1, 0)
-        self.wumpus_remain = num_wumpus
+        self.w_remain = num_w
         self.actions = []
         self.direction = 'E'
         self.has_gold = False
         self.has_arrow = True
-        self.wumpus_die = None
+        self.w_die = None
         self.size_known = map_size
         self.visited = set()
         self.percepts = [] # New percepts at current location
         self.KB = set()
     
     def update_direction(self, action):
-        directions = ['N', 'E', 'S', 'W']
+        directions = ['N', 'E', 'S', "W"]
         current_index = directions.index(self.direction)
         if action == 'turn left':
                 new_index = (current_index - 1) % 4 
@@ -31,14 +31,15 @@ class Agent:
         look_around = [(0, 1), (1, 0), (0, -1), (-1, 0)]
         current_pos = self.location
         self.visited.add(current_pos)
-
         percept_names = {p.name for p in self.percepts}
 
+        self.KB.add(make_clause([Literal("wumpus", tuple(current_pos), True, at_step)]))
+        self.KB.add(make_clause([Literal("pit", tuple(current_pos), True, at_step)]))
         # negative inferences
         if "stench" not in percept_names:
             for dy, dx in look_around:
                 nb = (current_pos[0] + dy, current_pos[1] + dx)
-                if 0 <= nb[0] < self.size_known and 0 <= nb[0] < self.size_known:
+                if 0 <= nb[0] < self.size_known and 0 <= nb[1] < self.size_known:
                     c = make_clause([Literal("wumpus", nb, True, at_step)])
                     if c:
                         self.KB.add(c)
@@ -47,7 +48,7 @@ class Agent:
         if "breeze" not in percept_names:
             for dy, dx in look_around:
                 nb = (current_pos[0] + dy, current_pos[1] + dx)
-                if 0 <= nb[0] < self.size_known and 0 <= nb[0] < self.size_known:
+                if 0 <= nb[0] < self.size_known and 0 <= nb[1] < self.size_known:
                     c = make_clause([Literal("pit", nb, True, at_step)])
                     if c:
                         self.KB.add(c)
@@ -66,7 +67,7 @@ class Agent:
                 or_literals = []
                 for dy, dx in look_around:
                     nb = (ppos[0] + dy, ppos[1] + dx)
-                    if 0 <= nb[0] < self.size_known and 0 <= nb[0] < self.size_known: 
+                    if 0 <= nb[0] < self.size_known and 0 <= nb[1] < self.size_known: 
                         or_literals.append(Literal("wumpus", nb, False, at_step))
                         impl = make_clause([Literal("wumpus", nb, True, at_step), Literal("stench", ppos, False, at_step)])
                         if impl:
@@ -83,7 +84,7 @@ class Agent:
                 or_literals = []
                 for dy, dx in look_around:
                     nb = (ppos[0] + dy, ppos[1] + dx)
-                    if 0 <= nb[0] < self.size_known and 0 <= nb[0] < self.size_known: 
+                    if 0 <= nb[0] < self.size_known and 0 <= nb[1] < self.size_known: 
                         or_literals.append(Literal("pit", nb, False, at_step))
                         impl = make_clause([Literal("pit", nb, True, at_step), Literal("breeze", ppos, False, at_step)])
                         if impl:
@@ -101,7 +102,7 @@ class Agent:
                 if c:
                     self.KB.add(c)
 
-        # Constraint: Pit and Wumpus cannot be in the same cell (¬Pit ∨ ¬Wumpus)
+        # Constraint: p and w cannot be in the same cell (¬p ∨ ¬w)
         for dy, dx in look_around:
             pos = (current_pos[0] + dy, current_pos[1] + dx)
             if 0 <= pos[0] < self.size_known and 0 <= pos[1] <self.size_known:
@@ -138,13 +139,13 @@ class Agent:
 
     def choose_action(self, mode='random'):
         if mode == 'random':
-            '''# Code tĩnh cho wumpus
+            '''# Code tĩnh cho w
             result = classify_all_literals(self.KB) 
             for (name, pos), status in sorted(result.items()):
                 pos_str = f"({', '.join(map(str, pos))})" if pos else ""
                 print(f"{name}{pos_str}: {status}")
             get_action = get_possible_actions(self, result)'''
-            # Code động cho wumpus
+            # Code động cho w
             current_step = len(self.actions)
             focus_pairs = build_focus_pairs_for_decision(self)          
             result = classify_all_local(self.KB, current_step, focus_pairs)
@@ -160,6 +161,7 @@ class Agent:
                 return 'move'
             if 'climb out' in get_action and self.has_gold:
                 return 'climb out'
+            elif 'climb out' in get_action: get_action.remove('climb out')
             if 'shoot' in get_action and self.has_arrow:
                 return 'shoot'
             return get_action.pop(random.randint(0, len(get_action) - 1)) 
