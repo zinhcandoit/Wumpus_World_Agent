@@ -96,7 +96,7 @@ class GameScreen(Screen):
         self.pit_img = Image("assets/pit.png")
         self.gold_img = Image("assets/gold.png")
         self.wumpus_img = Image("assets/wumpus 1.png")
-        self.stench_img = Image("assets/stench.png")
+        self.stench_img = Image("assets/stench 1.png")
         self.breeze_img = Image("assets/breeze.png")
         
         # Cache cho scaled images
@@ -323,6 +323,12 @@ class GameScreen(Screen):
         
         self.current_wumpus_pos[wumpus_idx] = (row, col)
 
+    def _adjacent_cells(self, r, c, rows, cols):
+        for dr, dc in [(-1,0),(1,0),(0,-1),(0,1)]:
+            nr, nc = r+dr, c+dc
+            if 0 <= nr < rows and 0 <= nc < cols:
+                yield nr, nc
+
     def draw(self, surface):
         """Vẽ toàn bộ screen"""
         self._draw_background(surface)
@@ -414,10 +420,10 @@ class GameScreen(Screen):
                 
                 # Vẽ tile nền
                 surface.blit(images["tile"], (x, y))
-                
-                # Vẽ các object (trừ agent, wumpus và gold)
-                for obj in grid[r][c]:
-                    if obj in images and obj not in ["agent", "wumpus", "gold"]:
+
+                # Vẽ pit
+                for obj in grid[r][c]: 
+                    if obj in images and obj == "pit": 
                         surface.blit(images[obj], (x, y))
         
         # Vẽ gold
@@ -428,6 +434,9 @@ class GameScreen(Screen):
         
         # Vẽ agent
         self._draw_agent(surface, start_x, start_y, cell_size, images, grid)
+
+        # Vẽ breeze, stench
+        self._draw_breeze_stench(surface, start_x, start_y, cell_size, images, grid)
 
     def _draw_gold(self, surface, start_x, start_y, cell_size, images, grid):
         """Vẽ gold dựa trên trạng thái animation"""
@@ -485,17 +494,57 @@ class GameScreen(Screen):
                         y = start_y + r * cell_size
                         surface.blit(images["agent"], (x, y))
 
+    def _draw_breeze_stench(self, surface, start_x, start_y, cell_size, images, grid):
+        rows, cols = len(grid), len(grid[0])
+
+        # 2.1 Breeze từ pit (pit tĩnh, dùng grid)
+        breeze_cells = set()
+        for r in range(rows):
+            for c in range(cols):
+                if "pit" in grid[r][c]:
+                    for nr, nc in self._adjacent_cells(r, c, rows, cols):
+                        breeze_cells.add((nr, nc))
+
+        # 2.2 Stench từ wumpus
+        stench_cells = set()
+        if self.game_ready and self.is_playing:
+            # dùng vị trí wumpus hiện tại và chỉ wumpus còn sống
+            for idx, pos in enumerate(self.current_wumpus_pos):
+                if pos and self.wumpus_alive[idx]:
+                    wr, wc = pos
+                    for nr, nc in self._adjacent_cells(wr, wc, rows, cols):
+                        stench_cells.add((nr, nc))
+        else:
+            # dùng wumpus trong grid khi không chạy animation
+            for r in range(rows):
+                for c in range(cols):
+                    if "wumpus" in grid[r][c]:
+                        for nr, nc in self._adjacent_cells(r, c, rows, cols):
+                            stench_cells.add((nr, nc))
+
+        # 2.3 Blit
+        for (r, c) in breeze_cells:
+            x = start_x + c * cell_size
+            y = start_y + r * cell_size
+            surface.blit(images["breeze"], (x, y))
+
+        for (r, c) in stench_cells:
+            x = start_x + c * cell_size
+            y = start_y + r * cell_size
+            surface.blit(images["stench"], (x, y))
+
+
     def _get_scaled_images(self, size):
         """Lấy images đã scale theo kích thước"""
         if size not in self.scaled_images:
             self.scaled_images[size] = {
                 "tile": pygame.transform.smoothscale(self.tile_img.image, (size, size)),
                 "agent": pygame.transform.smoothscale(self.agent_img.image, (size, size)),
-                "pit": pygame.transform.smoothscale(self.pit_img.image, (size, size)),
+                "pit": pygame.transform.smoothscale(self.pit_img.image, (size // 1.5, size // 1.5)),
                 "gold": pygame.transform.smoothscale(self.gold_img.image, (size, size)),
-                "wumpus": pygame.transform.smoothscale(self.wumpus_img.image, (size, size)),
-                "stench": pygame.transform.smoothscale(self.stench_img.image, (size, size)),
-                "breeze": pygame.transform.smoothscale(self.breeze_img.image, (size, size)),
+                "wumpus": pygame.transform.smoothscale(self.wumpus_img.image, (size - 20, size - 20)),
+                "stench": pygame.transform.smoothscale(self.stench_img.image, (size // 2, size // 2)),
+                "breeze": pygame.transform.smoothscale(self.breeze_img.image, (size // 2, size // 2)),
             }
         return self.scaled_images[size]
 
