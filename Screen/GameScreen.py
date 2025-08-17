@@ -123,12 +123,12 @@ class GameScreen(Screen):
         self.game = Game(size, pit, wumpus, hard)
         self.agent_pos = (size - 1, 0)  # Vị trí bắt đầu (góc dưới trái)
         self.agent_direction = "right"
+        # self.action_text.set_text("")
         
         # Lấy vị trí wumpus và gold ban đầu
         self.initial_wumpus_pos = self._get_wumpus_positions()
         self.current_wumpus_pos = self.initial_wumpus_pos.copy()
         self.wumpus_alive = [True] * len(self.initial_wumpus_pos)
-        
         self.initial_gold_pos = self._get_gold_positions()
         self.gold_collected = [False] * len(self.initial_gold_pos)
         
@@ -379,7 +379,11 @@ class GameScreen(Screen):
             self.speed_slider.draw(surface)
             
             # Progress
-            progress = f"Step: {min(self.current_step + 1, len(self.actions_list))}/{len(self.actions_list)}"
+            if self.current_step >= len(self.actions_list):
+                progress = f"Step {len(self.actions_list)}/{len(self.actions_list)}: {self.actions_list[-1]}"
+            else:
+                progress = f"Step {min(self.current_step + 1, len(self.actions_list))}/{len(self.actions_list)}: {self.actions_list[self.current_step]}"
+            # progress = f"Step {min(self.current_step + 1, len(self.actions_list))}/{len(self.actions_list)}: {}"
             progress_text = Text(progress, "Arial", Color.CYAN, self.panel_x + 20, 675, "left", "small")
             progress_text.draw(surface)
 
