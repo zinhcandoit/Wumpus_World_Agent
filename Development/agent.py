@@ -372,7 +372,7 @@ class Agent:
             if 'shoot' in get_action and self.has_arrow:
                 return 'shoot'
             return get_action.pop(random.randint(0, len(get_action) - 1))
-                elif mode == 'logic':
+        elif mode == 'logic':
             '''# Code tĩnh cho w
             result = classify_all_literals(self.KB) 
             for (name, pos), status in sorted(result.items()):
