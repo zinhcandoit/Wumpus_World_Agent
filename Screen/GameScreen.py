@@ -319,10 +319,6 @@ class GameScreen(Screen):
         self.hard_mode_text.draw(surface)
         self.hard_mode_toggle.draw(surface)
         
-        # Status
-        self._update_status_text()
-        self.status_text.draw(surface)
-        
         # Buttons
         self.start_button.draw(surface)
         self.back_button.draw(surface)
@@ -343,18 +339,6 @@ class GameScreen(Screen):
             progress = f"Step: {min(self.current_step + 1, len(self.actions_list))}/{len(self.actions_list)}"
             progress_text = Text(progress, "Arial", Color.CYAN, self.panel_x + 20, 675, "left", "small")
             progress_text.draw(surface)
-
-    def _update_status_text(self):
-        """Cập nhật text trạng thái"""
-        if self.game_ready:
-            if self.is_playing:
-                msg = f"Playing... Score: {self.game_result}"
-            else:
-                msg = f"Ready! Actions: {len(self.actions_list)}, Score: {self.game_result}"
-        else:
-            msg = "Configure and start game"
-        
-        self.status_text.text = msg
 
     def _draw_game_map(self, surface):
         """Vẽ bản đồ game"""
@@ -378,18 +362,7 @@ class GameScreen(Screen):
         start_y = (map_height - rows * cell_size) // 2
         
         # Vẽ lưới và ô
-        self._draw_grid(surface, start_x, start_y, rows, cols, cell_size)
         self._draw_map_content(surface, start_x, start_y, rows, cols, cell_size, grid)
-
-    def _draw_grid(self, surface, x, y, rows, cols, size):
-        """Vẽ lưới"""
-        color = (40, 40, 40)
-        # Đường ngang
-        for r in range(rows + 1):
-            pygame.draw.line(surface, color, (x, y + r * size), (x + cols * size, y + r * size))
-        # Đường dọc
-        for c in range(cols + 1):
-            pygame.draw.line(surface, color, (x + c * size, y), (x + c * size, y + rows * size))
 
     def _draw_map_content(self, surface, start_x, start_y, rows, cols, cell_size, grid):
         """Vẽ nội dung bản đồ"""
