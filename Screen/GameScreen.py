@@ -7,7 +7,6 @@ from Design.UI.toggle import Toggle
 from Design.ImageManager.Image import Image
 from Development.gameState import Game
 from constant import *
-import time
 
 class GameScreen(Screen):
     def __init__(self, screen_manager):
@@ -41,6 +40,10 @@ class GameScreen(Screen):
         self.initial_wumpus_pos = []
         self.current_wumpus_pos = []
         self.wumpus_alive = []
+        
+        # Trạng thái gold
+        self.initial_gold_pos = []
+        self.gold_collected = []  
         
         self._setup_ui()
         self._load_images()
@@ -121,10 +124,13 @@ class GameScreen(Screen):
         self.agent_pos = (size - 1, 0)  # Vị trí bắt đầu (góc dưới trái)
         self.agent_direction = "right"
         
-        # Lấy vị trí wumpus ban đầu
+        # Lấy vị trí wumpus và gold ban đầu
         self.initial_wumpus_pos = self._get_wumpus_positions()
         self.current_wumpus_pos = self.initial_wumpus_pos.copy()
         self.wumpus_alive = [True] * len(self.initial_wumpus_pos)
+        
+        self.initial_gold_pos = self._get_gold_positions()
+        self.gold_collected = [False] * len(self.initial_gold_pos)
         
         # Chạy AI solver
         score, actions, wumpus_moves = self.game.play()
@@ -146,6 +152,18 @@ class GameScreen(Screen):
         for r in range(len(self.game.map.grid)):
             for c in range(len(self.game.map.grid[0])):
                 if 'wumpus' in self.game.map.grid[r][c]:
+                    positions.append((r, c))
+        return positions
+
+    def _get_gold_positions(self):
+        """Tìm tất cả vị trí gold trên map"""
+        if not self.game or not hasattr(self.game, "map"):
+            return []
+        
+        positions = []
+        for r in range(len(self.game.map.grid)):
+            for c in range(len(self.game.map.grid[0])):
+                if 'gold' in self.game.map.grid[r][c]:
                     positions.append((r, c))
         return positions
 
@@ -183,6 +201,7 @@ class GameScreen(Screen):
         self.agent_direction = "right"
         self.current_wumpus_pos = self.initial_wumpus_pos.copy()
         self.wumpus_alive = [True] * len(self.initial_wumpus_pos)
+        self.gold_collected = [False] * len(self.initial_gold_pos)
 
     def update(self):
         """Cập nhật trạng thái của screen"""
@@ -210,6 +229,7 @@ class GameScreen(Screen):
             if self.current_step < len(self.actions_list):
                 self._execute_animation_step()
                 self._update_wumpus_for_step()
+                self._update_gold_for_step()
                 self.current_step += 1
                 self.last_update_time = current_time
             else:
@@ -265,6 +285,23 @@ class GameScreen(Screen):
             else:
                 # Di chuyển wumpus
                 self._move_wumpus(wumpus_idx, action)
+
+    def _update_gold_for_step(self):
+        """Cập nhật trạng thái gold cho bước hiện tại"""
+        if self.current_step >= len(self.actions_list):
+            return
+            
+        action = self.actions_list[self.current_step].lower().strip()
+        
+        # Kiểm tra nếu action là grab
+        if "grab" in action:
+            # Tìm gold ở vị trí hiện tại của agent
+            agent_row, agent_col = self.agent_pos
+            for gold_idx, gold_pos in enumerate(self.initial_gold_pos):
+                if gold_pos == (agent_row, agent_col) and not self.gold_collected[gold_idx]:
+                    self.gold_collected[gold_idx] = True
+                    print(f"Gold grabbed at position {gold_pos}")
+                    break
 
     def _move_wumpus(self, wumpus_idx, direction):
         """Di chuyển wumpus theo hướng chỉ định"""
@@ -378,16 +415,38 @@ class GameScreen(Screen):
                 # Vẽ tile nền
                 surface.blit(images["tile"], (x, y))
                 
-                # Vẽ các object (trừ agent và wumpus)
+                # Vẽ các object (trừ agent, wumpus và gold)
                 for obj in grid[r][c]:
-                    if obj in images and obj not in ["agent", "wumpus"]:
+                    if obj in images and obj not in ["agent", "wumpus", "gold"]:
                         surface.blit(images[obj], (x, y))
+        
+        # Vẽ gold
+        self._draw_gold(surface, start_x, start_y, cell_size, images, grid)
         
         # Vẽ wumpus
         self._draw_wumpuses(surface, start_x, start_y, cell_size, images, grid)
         
         # Vẽ agent
         self._draw_agent(surface, start_x, start_y, cell_size, images, grid)
+
+    def _draw_gold(self, surface, start_x, start_y, cell_size, images, grid):
+        """Vẽ gold dựa trên trạng thái animation"""
+        if self.game_ready and self.is_playing:
+            # Vẽ gold chưa được grab
+            for idx, gold_pos in enumerate(self.initial_gold_pos):
+                if not self.gold_collected[idx]:
+                    row, col = gold_pos
+                    x = start_x + col * cell_size
+                    y = start_y + row * cell_size
+                    surface.blit(images["gold"], (x, y))
+        else:
+            # Vẽ gold ở vị trí ban đầu khi không animation
+            for r in range(len(grid)):
+                for c in range(len(grid[0])):
+                    if "gold" in grid[r][c]:
+                        x = start_x + c * cell_size
+                        y = start_y + r * cell_size
+                        surface.blit(images["gold"], (x, y))
 
     def _draw_wumpuses(self, surface, start_x, start_y, cell_size, images, grid):
         """Vẽ các wumpus"""
