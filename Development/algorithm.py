@@ -1,6 +1,6 @@
 from Development.definition import Literal
-# Cause wumpus can move!
-dynamic_literal = {'wumpus', 'stench'}
+# Cause w can move!
+dynamic_literal = {"wumpus", "stench"}
 
 def make_clause(literals):
             """Canonicalize clause -> frozenset; drop tautologies (A and ¬A)."""
@@ -168,28 +168,29 @@ def tt_entails(KB, alpha_literal):
 def build_focus_pairs_for_decision(agent):
     y, x = agent.location
     nbr = [(y, x+1), (y+1, x), (y, x-1), (y-1, x)]
-
-    focus = {('stench', (y, x)), ('gold', (y, x))}
+    focus = set()
+    if agent.has_gold == False:
+        focus.add(("gold", (y,x)))
     for nb in nbr:
         if 0 <= nb[0] < agent.size_known and 0 <= nb[1] < agent.size_known:
-            focus.add(('wumpus', nb))
-            focus.add(('pit', nb))
+            focus.add(("wumpus", nb))
+            focus.add(("pit", nb))
 
     # Mở rộng cho SHOOT (bắn xa)
     if agent.has_arrow:
         # 1) nếu đã có dự đoán trước
         if getattr(agent, 'wumpus_die', None) is not None:
-            focus.add(('wumpus', tuple(agent.wumpus_die)))
-
+            focus.add(("wumpus", tuple(agent.wumpus_die)))
+        else:
         # 2) thêm ray theo hướng hiện tại
-        direction_moves = {'N': (-1, 0), 'S': (1, 0), 'W': (0, -1), 'E': (0, 1)}
-        dy, dx = direction_moves[agent.direction]
-        y, x = agent.location
-        for i in range(1, agent.size_known):
-            cell = (y + i*dy, x + i*dx)
-            if not (0 <= cell[0] < agent.size_known and 0 <= cell[1] < agent.size_known):
-                break
-            focus.add(('wumpus', cell))
+            direction_moves = {'N': (-1, 0), "S": (1, 0), "W": (0, -1), 'E': (0, 1)}
+            dy, dx = direction_moves[agent.direction]
+            y, x = agent.location
+            for i in range(1, agent.size_known):
+                cell = (y + i*dy, x + i*dx)
+                if not (0 <= cell[0] < agent.size_known and 0 <= cell[1] < agent.size_known):
+                    break
+                focus.add(("wumpus", cell))
     return focus
 
 def classify_all_local(KB, current_step, focus_pairs):
@@ -223,7 +224,7 @@ def classify_all_local(KB, current_step, focus_pairs):
 
 def get_possible_actions_now(agent, status_map):
     actions = []
-    direction_moves = {'N': (-1, 0), 'S': (1, 0), 'W': (0, -1), 'E': (0, 1)}
+    direction_moves = {'N': (-1, 0), "S": (1, 0), "W": (0, -1), 'E': (0, 1)}
 
     if status_map.get(("gold", agent.location)) == "UNSAFE" and not agent.has_gold:
         actions.append("grab")
@@ -237,20 +238,21 @@ def get_possible_actions_now(agent, status_map):
     front_cell = (agent.location[0] + dy, agent.location[1] + dx)
     if 0 <= front_cell[0] < agent.size_known and 0 <= front_cell[1] < agent.size_known:
         pit_state = status_map.get(("pit", front_cell), "UNKNOWN")
-        wumpus_state = status_map.get(("wumpus", front_cell), "UNKNOWN")
-        if pit_state != "UNSAFE" and wumpus_state != "UNSAFE":
+        w_state = status_map.get(("wumpus", front_cell), "UNKNOWN")
+            # không mùi -> cho move nếu không bị đánh dấu UNSAFE
+        if pit_state != "UNSAFE" and w_state != "UNSAFE":
             actions.append("move")
     
-    wumpus_infront = False
+    w_infront = False
     for i in range(1, agent.size_known):
         nb = (agent.location[0] + i * dy, agent.location[1] + i * dx)
         if not (0 <= nb[0] < agent.size_known and 0 <= nb[1] < agent.size_known):
             break  # out of bounds
-        if status_map.get(("wumpus", front_cell), "UNKNOWN") == "UNSAFE":
-            wumpus_infront = True
-            agent.wumpus_die = front_cell
-        else: wumpus_infront = False
-    if agent.has_arrow and wumpus_infront:
+        if status_map.get(("wumpus", nb), "UNKNOWN") == "UNSAFE":
+            w_infront = True
+            agent.wumpus_die = nb
+        else: w_infront = False
+    if agent.has_arrow and w_infront:
         actions.append("shoot")
 
     return actions
