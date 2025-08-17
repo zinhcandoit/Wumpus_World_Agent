@@ -9,11 +9,9 @@ class Map:
         self.size = size
         self.grid = self.generate(size, pit_density, num_wumpus)
         self.num_wumpus = num_wumpus
-        # Khởi tạo danh sách lưu hành động của từng con wumpus
+        
         self.wumpus_move = [[] for _ in range(num_wumpus)]
-        # Theo dõi vị trí hiện tại của từng wumpus (None nếu chết)
         self.wumpus_positions = self._get_wumpus_positions()[:num_wumpus]
-        # Theo dõi trạng thái sống/chết của từng wumpus
         self.wumpus_alive = [True] * num_wumpus
 
     def generate(self, size, pit_density, num_wumpus):

@@ -45,7 +45,7 @@ class Game:
                 self.agent.actions.append("die")
                 self.update_score()
                 break
-            if (len(self.agent.actions) > 30):
+            if (len(self.agent.actions) > 300):
                 print("Too many actions, stopping the self.")
                 break
 
