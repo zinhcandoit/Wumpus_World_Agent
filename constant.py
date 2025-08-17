@@ -8,6 +8,8 @@ DEFAULT_BUTTON_HEIGHT = 50
 DEFAULT_BOARD_WIDTH = 500
 DEFAULT_BOARD_HEIGHT = 500
 
+START_MAP_SIZE = (600, 600)
+
 class Color:
     BLACK = (0, 0, 0)
     WHITE = (255, 255, 255)
@@ -21,3 +23,6 @@ class Color:
     DARK_RED = (150, 0, 0)
     CYAN = (0, 255, 255)
     DARK_BLUE = (0, 0, 150) 
+    ORANGE = (255, 165, 0)
+    GRAY = (128, 128, 128)
+    LIME = (0, 255, 0)

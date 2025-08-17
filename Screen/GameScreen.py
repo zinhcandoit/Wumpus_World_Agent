@@ -1,6 +1,4 @@
 import pygame
-import threading
-import time
 from Screen.BaseScreen import Screen
 from Design.UI.text import Text
 from Design.UI.slider import Slider
@@ -10,418 +8,592 @@ from Design.ImageManager.Image import Image
 from Development.gameState import Game
 from constant import *
 
-# Custom events
-GAME_STEP_EVENT = pygame.USEREVENT + 1
-GAME_END_EVENT = pygame.USEREVENT + 2
-
 class GameScreen(Screen):
     def __init__(self, screen_manager):
         super().__init__(screen_manager)
-
+        
+        # Cấu hình game cơ bản
         self.map_size = 8
         self.pit_density = 0.2
         self.num_wumpus = 2
         self.hard_mode = False
-
-        self.Game = None
+        
+        # Trạng thái game
+        self.game = None
+        self.game_ready = False
+        self.game_result = None
+        self.actions_list = []
+        
+        # Trạng thái animation
         self.is_playing = False
-        self.game_thread = None
+        self.is_paused = False
+        self.current_step = 0
+        self.last_update_time = 0
+        self.animation_speed = 1000  # milliseconds per step
         
-        # Game state
-        self.current_action = ""
-        self.game_step = 0
-        self.game_finished = False
+        # Vị trí và hướng của agent trong animation
+        self.agent_pos = (0, 0)  # (row, col)
+        self.agent_direction = "right"
+        
+        # Vị trí wumpus trong animation
+        self.wumpus_movements = []
+        self.initial_wumpus_pos = []
+        self.current_wumpus_pos = []
+        self.wumpus_alive = []
+        
+        # Trạng thái gold
+        self.initial_gold_pos = []
+        self.gold_collected = []  
+        
+        self._setup_ui()
+        self._load_images()
 
-        self.ui_panel_width = SCREEN_WIDTH // 4
-        self.ui_panel_x = SCREEN_WIDTH - self.ui_panel_width  
-        self.ui_center_x = self.ui_panel_x + self.ui_panel_width // 2
-
-        # Slider list kèm label
-        self.slider_list = [
-            {
-                "label": "Map Size:",
-                "slider": Slider(self.ui_center_x, 145, self.ui_panel_width // 3 + 20, 20, 8, 4, 12),
-                "label_pos": (self.ui_panel_x + 20, 140)
-            }, 
-            {
-                "label": "Pit Density:",
-                "slider": Slider(self.ui_center_x, 225, self.ui_panel_width // 3 + 20, 20, 0.2, 0.1, 0.5),
-                "label_pos": (self.ui_panel_x + 20, 220)
-            }, 
-            {
-                "label": "Number of Wumpus:",
-                "slider": Slider(self.ui_center_x, 305, self.ui_panel_width // 3 + 20, 20, 2, 1, 5),
-                "label_pos": (self.ui_panel_x + 20, 300)
-            }, 
+    def _setup_ui(self):
+        """Thiết lập giao diện người dùng"""
+        # Kích thước và vị trí panel
+        self.panel_width = SCREEN_WIDTH // 4
+        self.panel_x = SCREEN_WIDTH - self.panel_width
+        self.panel_center_x = self.panel_x + self.panel_width // 2
+        
+        # Sliders cho cấu hình game
+        self.sliders = [
+            {"name": "Map Size:", "slider": Slider(self.panel_center_x, 145, 120, 20, 6, 4, 8), "pos": (self.panel_x + 20, 140)},
+            {"name": "Pit Density:", "slider": Slider(self.panel_center_x, 225, 120, 20, 0.2, 0.1, 0.5), "pos": (self.panel_x + 20, 220)},
+            {"name": "Wumpus Count:", "slider": Slider(self.panel_center_x, 305, 120, 20, 2, 1, 5), "pos": (self.panel_x + 20, 300)},
         ]
-
-        # Buttons
-        button_width = self.ui_panel_width - 40
-        self.start_btn = Button("Start", "Arial", button_width, 40, self.ui_center_x, 490, Color.DARK_GREEN, Color.WHITE, "body", "center")
-        self.stop_btn = Button("Stop", "Arial", button_width, 40, self.ui_center_x, 490, Color.DARK_RED, Color.WHITE, "body", "center")
-        self.back_btn = Button("Back to menu", "Arial", button_width, 40, self.ui_center_x, 550, Color.DARK_RED, Color.WHITE, "body", "center")
-
-        # Toggle
-        self.toggle_label = Text("Hard Mode", "Arial", Color.WHITE, self.ui_panel_x + 20, 360, "left", "body")
-        self.toggle = Toggle(self.ui_panel_x + self.ui_panel_width - 60, 355, value=False)
-
-        # Title & Status
-        self.title = Text("Game Information", "Arial", Color.WHITE, self.ui_center_x, 50, "center", "sub_title")
-        self.status_text = Text("Ready to start", "Arial", Color.WHITE, self.ui_panel_x + 20, 420, "left", "body")
         
+        # Buttons
+        button_width = self.panel_width - 40
+        self.start_button = Button("Solving New Map", "Arial", button_width, 40, self.panel_center_x, 440, Color.DARK_GREEN, Color.WHITE, "body", "center")
+        self.back_button = Button("Back to Menu", "Arial", button_width, 40, self.panel_center_x, 490, Color.DARK_RED, Color.WHITE, "body", "center")
+        
+        # Animation controls
+        self.play_button = Button("Play", "Arial", button_width, 30, self.panel_center_x, 540, Color.BLUE, Color.WHITE, "small", "center")
+        self.pause_button = Button("Pause", "Arial", button_width//2 - 5, 30, self.panel_center_x - button_width//4, 580, Color.ORANGE, Color.WHITE, "small", "center")
+        self.reset_button = Button("Reset", "Arial", button_width//2 - 5, 30, self.panel_center_x + button_width//4, 580, Color.GRAY, Color.WHITE, "small", "center")
+        
+        # Toggle và speed control
+        self.hard_mode_toggle = Toggle(self.panel_x + self.panel_width - 60, 355, value=False)
+        self.speed_slider = Slider(self.panel_center_x, 625, 120, 15, 1.0, 0.2, 3.0)
+        
+        # Text elements
+        self.title_text = Text("Game Configuration", "Arial", Color.WHITE, self.panel_center_x, 50, "center", "sub_title")
+        self.hard_mode_text = Text("Hard Mode", "Arial", Color.WHITE, self.panel_x + 20, 360, "left", "body")
+        self.status_text = Text("Ready to start", "Arial", Color.WHITE, self.panel_x + 20, 390, "left", "body")
+        self.speed_text = Text("Animation Speed:", "Arial", Color.WHITE, self.panel_x + 20, 620, "left", "small")
+
+    def _load_images(self):
+        """Tải và thiết lập các hình ảnh"""
         # Background
-        self.bg = Image("assets/background/intro.jpg", SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0)
+        self.background = Image("assets/background/intro.jpg", SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0)
         self.overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.overlay.fill((0, 0, 0))
         self.overlay.set_alpha(100)
+        
+        # Game objects
+        self.agent_img = Image("assets/agent.png")
+        self.tile_img = Image("assets/tileset/tile.png")
+        self.pit_img = Image("assets/pit.png")
+        self.gold_img = Image("assets/gold.png")
+        self.wumpus_img = Image("assets/wumpus 1.png")
+        self.stench_img = Image("assets/stench 1.png")
+        self.breeze_img = Image("assets/breeze.png")
+        
+        # Cache cho scaled images
+        self.scaled_images = {}
+        self.agent_rotated = {}
 
-    def draw_bg(self, surface):
-        self.bg.draw(surface)
-        surface.blit(self.overlay, (0, 0))
+    def start_new_game(self):
+        """Khởi tạo game mới với cấu hình hiện tại"""
+        # Lấy giá trị từ UI
+        size = int(self.sliders[0]["slider"].value)
+        pit = self.sliders[1]["slider"].value
+        wumpus = int(self.sliders[2]["slider"].value)
+        hard = self.hard_mode_toggle.value
+        
+        print(f"Starting game: {size}x{size}, pit density: {pit}, wumpus: {wumpus}, hard mode: {hard}")
+        
+        # Reset trạng thái
+        self.game_ready = False
+        self.game_result = None
+        self.actions_list = []
+        self.stop_animation()
+        
+        # Tạo game mới
+        self.game = Game(size, pit, wumpus, hard)
+        self.agent_pos = (size - 1, 0)  # Vị trí bắt đầu (góc dưới trái)
+        self.agent_direction = "right"
+        # self.action_text.set_text("")
+        
+        # Lấy vị trí wumpus và gold ban đầu
+        self.initial_wumpus_pos = self._get_wumpus_positions()
+        self.current_wumpus_pos = self.initial_wumpus_pos.copy()
+        self.wumpus_alive = [True] * len(self.initial_wumpus_pos)
+        self.initial_gold_pos = self._get_gold_positions()
+        self.gold_collected = [False] * len(self.initial_gold_pos)
+        
+        # Chạy AI solver
+        score, actions, wumpus_moves = self.game.play()
+        
+        # Lưu kết quả
+        self.game_result = score
+        self.actions_list = actions or []
+        self.wumpus_movements = wumpus_moves or []
+        self.game_ready = True
+        
+        print(f"Game completed - Score: {score}, Actions: {len(self.actions_list)}")
 
-    def draw_title(self, surface):
-        self.title.draw(surface)
+    def _get_wumpus_positions(self):
+        """Tìm tất cả vị trí wumpus trên map"""
+        if not self.game or not hasattr(self.game, "map"):
+            return []
+        
+        positions = []
+        for r in range(len(self.game.map.grid)):
+            for c in range(len(self.game.map.grid[0])):
+                if 'wumpus' in self.game.map.grid[r][c]:
+                    positions.append((r, c))
+        return positions
 
-    def draw_ui_panel_background(self, surface):
-        panel_surface = pygame.Surface((self.ui_panel_width, SCREEN_HEIGHT))
-        panel_surface.fill((0, 0, 0))
-        panel_surface.set_alpha(150)
-        surface.blit(panel_surface, (self.ui_panel_x, 0))
+    def _get_gold_positions(self):
+        """Tìm tất cả vị trí gold trên map"""
+        if not self.game or not hasattr(self.game, "map"):
+            return []
+        
+        positions = []
+        for r in range(len(self.game.map.grid)):
+            for c in range(len(self.game.map.grid[0])):
+                if 'gold' in self.game.map.grid[r][c]:
+                    positions.append((r, c))
+        return positions
 
-    def draw(self, surface):
-        self.draw_bg(surface)
-        self.draw_ui_panel_background(surface)
-        self.draw_title(surface)
+    def start_animation(self):
+        """Bắt đầu phát animation"""
+        if self.game_ready and self.actions_list:
+            self.is_playing = True
+            self.is_paused = False
+            self.last_update_time = pygame.time.get_ticks()
+            if self.current_step == 0:
+                self._reset_to_start_position()
 
-        # Slider + label
-        for item in self.slider_list:
-            label = Text(item["label"], "Arial", Color.WHITE, item["label_pos"][0], item["label_pos"][1], "left", "body")
-            label.draw(surface)
-            item["slider"].draw(surface)
-
-        # Toggle
-        self.toggle_label.draw(surface)
-        self.toggle.draw(surface)
-
-        # Status text
+    def pause_animation(self):
+        """Tạm dừng/tiếp tục animation"""
         if self.is_playing:
-            status_msg = f"Step {self.game_step}: {self.current_action}"
-        elif self.game_finished:
-            status_msg = "Game finished!"
-        else:
-            status_msg = "Ready to start"
-        
-        self.status_text.text = status_msg
-        self.status_text.draw(surface)
+            self.is_paused = not self.is_paused
+            if not self.is_paused:
+                self.last_update_time = pygame.time.get_ticks()
 
-        # Buttons
-        if self.is_playing:
-            self.stop_btn.draw(surface)
-        else:
-            self.start_btn.draw(surface)
-        self.back_btn.draw(surface)
-
-        # Game map
-        if self.Game:
-            self.draw_game_map(surface)
-
-    def game_loop_worker(self):
-        """Worker thread cho game logic"""
-        try:
-            while self.is_playing and self.Game:
-                # Game step
-                self.Game.agent_take_percepts()  
-                self.Game.agent.get_KB_from_percepts()
-                action = self.Game.agent.choose_action('random')   
-                self.Game.actions.append(action)
-                self.Game.update_score()
-                
-                # Post event về main thread
-                step_event = pygame.event.Event(GAME_STEP_EVENT, {
-                    'action': action,
-                    'step': len(self.Game.actions)
-                })
-                pygame.event.post(step_event)
-                
-                print(f'Iter {len(self.Game.actions)}: Action: {action}')
-                
-                # Check game end
-                game_ended = False
-                if action == "climb out":
-                    game_ended = True
-                else:
-                    flag = self.Game.map.update_map(action, self.Game.agent)
-                    if not flag:
-                        self.Game.actions.append("die")
-                        self.Game.update_score()
-                        game_ended = True
-                    elif len(self.Game.actions) > 20:
-                        print("Too many actions, stopping the game.")
-                        game_ended = True
-                
-                if game_ended:
-                    end_event = pygame.event.Event(GAME_END_EVENT, {
-                        'final_score': getattr(self.Game, 'score', 0)
-                    })
-                    pygame.event.post(end_event)
-                    break
-                
-                # Delay
-                time.sleep(0.5)
-                
-        except Exception as e:
-            print(f"Game loop error: {e}")
-            pygame.event.post(pygame.event.Event(GAME_END_EVENT, {'error': str(e)}))
-
-    def start_game(self):
-        size = int(self.slider_list[0]["slider"].value)
-        pit = self.slider_list[1]["slider"].value
-        wumpus = int(self.slider_list[2]["slider"].value)
-        hard = self.toggle.value
-        
-        print("Game configuration: ", size, pit, wumpus, hard)
-        
-        self.Game = Game(size, pit, wumpus, hard)
-        self.is_playing = True
-        self.game_finished = False
-        self.game_step = 0
-        self.current_action = ""
-        
-        # Khởi động worker thread
-        self.game_thread = threading.Thread(target=self.game_loop_worker, daemon=True)
-        self.game_thread.start()
-
-    def stop_game(self):
+    def stop_animation(self):
+        """Dừng và reset animation"""
         self.is_playing = False
-        if self.game_thread and self.game_thread.is_alive():
-            self.game_thread.join(timeout=1.0)
+        self.is_paused = False
+        self.current_step = 0
+        if self.game:
+            self._reset_to_start_position()
+
+    def _reset_to_start_position(self):
+        """Reset về vị trí ban đầu"""
+        if not self.game:
+            return
+            
+        size = len(self.game.map.grid)
+        self.agent_pos = (size - 1, 0)
+        self.agent_direction = "right"
+        self.current_wumpus_pos = self.initial_wumpus_pos.copy()
+        self.wumpus_alive = [True] * len(self.initial_wumpus_pos)
+        self.gold_collected = [False] * len(self.initial_gold_pos)
 
     def update(self):
-        for item in self.slider_list:
-            item["slider"].update()
-        self.toggle.update()
+        """Cập nhật trạng thái của screen"""
+        # Cập nhật UI controls
+        for slider_info in self.sliders:
+            slider_info["slider"].update()
+        
+        self.hard_mode_toggle.update()
+        
+        if self.game_ready:
+            self.speed_slider.update()
+        
+        # Cập nhật animation
+        self._update_animation()
 
-    def draw_game_map(self, surface):
-        if not self.Game or not self.Game.map:
+    def _update_animation(self):
+        """Cập nhật animation nếu đang chạy"""
+        if not self.is_playing or self.is_paused:
             return
         
-        # Map drawing area (left side of screen, excluding UI panel)
-        map_area_width = self.ui_panel_x - 40  # 40px padding
-        map_area_height = SCREEN_HEIGHT - 80   # 80px padding (40 top, 40 bottom)
-        map_start_x = 20
-        map_start_y = 40
+        current_time = pygame.time.get_ticks()
+        step_duration = max(200, int(self.animation_speed / self.speed_slider.value))
         
-        # Calculate cell size based on map size and available space
-        cell_size = min(map_area_width // self.Game.map.size, 
-                    map_area_height // self.Game.map.size)
+        if current_time - self.last_update_time >= step_duration:
+            if self.current_step < len(self.actions_list):
+                self._execute_animation_step()
+                self._update_wumpus_for_step()
+                self._update_gold_for_step()
+                self.current_step += 1
+                self.last_update_time = current_time
+            else:
+                self.is_playing = False
+
+    def _execute_animation_step(self):
+        """Thực hiện một bước animation"""
+        if self.current_step >= len(self.actions_list):
+            return
         
-        # Center the map in the available area
-        total_map_width = cell_size * self.Game.map.size
-        total_map_height = cell_size * self.Game.map.size
-        map_offset_x = map_start_x + (map_area_width - total_map_width) // 2
-        map_offset_y = map_start_y + (map_area_height - total_map_height) // 2
+        action = self.actions_list[self.current_step].lower().strip()
+        row, col = self.agent_pos
         
-        # Draw grid background
-        for row in range(self.Game.map.size):
-            for col in range(self.Game.map.size):
-                x = map_offset_x + col * cell_size
-                y = map_offset_y + row * cell_size
-                
-                # Cell background (alternating colors for better visibility)
-                if (row + col) % 2 == 0:
-                    cell_color = (40, 40, 40)  # Dark gray
-                else:
-                    cell_color = (60, 60, 60)  # Lighter gray
-                
-                pygame.draw.rect(surface, cell_color, (x, y, cell_size, cell_size))
-                
-                # Cell border
-                pygame.draw.rect(surface, Color.WHITE, (x, y, cell_size, cell_size), 1)
+        if action == "move":
+            # Di chuyển theo hướng hiện tại
+            if self.agent_direction == "up":
+                self.agent_pos = (max(0, row - 1), col)
+            elif self.agent_direction == "down":
+                self.agent_pos = (min(len(self.game.map.grid) - 1, row + 1), col)
+            elif self.agent_direction == "left":
+                self.agent_pos = (row, max(0, col - 1))
+            elif self.agent_direction == "right":
+                self.agent_pos = (row, min(len(self.game.map.grid[0]) - 1, col + 1))
         
-        # Draw map contents
-        for row in range(self.Game.map.size):
-            for col in range(self.Game.map.size):
-                x = map_offset_x + col * cell_size
-                y = map_offset_y + row * cell_size
-                cell_center_x = x + cell_size // 2
-                cell_center_y = y + cell_size // 2
-                
-                cell_contents = self.Game.map.grid[row][col]
-                
-                # Draw multiple elements in the same cell
-                element_positions = []
-                
-                # Wumpus (highest priority - center)
-                if 'wumpus' in cell_contents:
-                    pygame.draw.circle(surface, Color.DARK_RED, (cell_center_x, cell_center_y), cell_size // 4)
-                    # Draw eyes
-                    eye_offset = cell_size // 8
-                    pygame.draw.circle(surface, Color.WHITE, 
-                                    (cell_center_x - eye_offset, cell_center_y - eye_offset), 3)
-                    pygame.draw.circle(surface, Color.WHITE, 
-                                    (cell_center_x + eye_offset, cell_center_y - eye_offset), 3)
-                    element_positions.append('center')
-                
-                # Pit (center if no wumpus)
-                elif 'pit' in cell_contents:
-                    pygame.draw.circle(surface, Color.BLACK, (cell_center_x, cell_center_y), cell_size // 3)
-                    pygame.draw.circle(surface, Color.DARK_GRAY, (cell_center_x, cell_center_y), cell_size // 4)
-                    element_positions.append('center')
-                
-                # Gold (top-right corner)
-                if 'gold' in cell_contents:
-                    gold_x = x + cell_size - cell_size // 4
-                    gold_y = y + cell_size // 4
-                    pygame.draw.circle(surface, Color.YELLOW, (gold_x, gold_y), cell_size // 6)
-                    # Draw gold shine
-                    pygame.draw.circle(surface, Color.WHITE, (gold_x - 2, gold_y - 2), 2)
-                    element_positions.append('top-right')
-                
-                # Agent (center if no wumpus/pit, otherwise bottom)
-                if 'agent' in cell_contents:
-                    agent = self.Game.agent
-                    if 'center' not in element_positions:
-                        agent_x, agent_y = cell_center_x, cell_center_y
-                    else:
-                        agent_x, agent_y = cell_center_x, y + cell_size - cell_size // 4
-                    
-                    # Agent body
-                    pygame.draw.circle(surface, Color.BLUE, (agent_x, agent_y), cell_size // 6)
-                    
-                    # Agent direction indicator
-                    direction_offsets = {
-                        'N': (0, -cell_size // 4),
-                        'S': (0, cell_size // 4),
-                        'E': (cell_size // 4, 0),
-                        'W': (-cell_size // 4, 0)
-                    }
-                    
-                    if hasattr(agent, 'direction') and agent.direction in direction_offsets:
-                        dx, dy = direction_offsets[agent.direction]
-                        arrow_end_x = agent_x + dx
-                        arrow_end_y = agent_y + dy
-                        pygame.draw.line(surface, Color.WHITE, (agent_x, agent_y), 
-                                    (arrow_end_x, arrow_end_y), 2)
-                        # Arrow head
-                        pygame.draw.circle(surface, Color.WHITE, (arrow_end_x, arrow_end_y), 2)
-                
-                # Percept indicators (smaller icons in corners)
-                percept_size = cell_size // 8
-                
-                # Check if this cell has stench (adjacent to wumpus)
-                if self.Game.map.has_adjacent(row, col, 'wumpus'):
-                    stench_x = x + cell_size // 8
-                    stench_y = y + cell_size // 8
-                    pygame.draw.circle(surface, Color.GREEN, (stench_x, stench_y), percept_size)
-                    # Draw wavy lines for stench
-                    for i in range(3):
-                        start_y = stench_y - percept_size + i * 3
-                        end_y = start_y
-                        pygame.draw.line(surface, Color.DARK_GREEN, 
-                                    (stench_x - percept_size, start_y), 
-                                    (stench_x + percept_size, end_y), 1)
-                
-                # Check if this cell has breeze (adjacent to pit)
-                if self.Game.map.has_adjacent(row, col, 'pit'):
-                    breeze_x = x + cell_size - cell_size // 8
-                    breeze_y = y + cell_size // 8
-                    pygame.draw.circle(surface, Color.CYAN, (breeze_x, breeze_y), percept_size)
-                    # Draw wind lines for breeze
-                    for i in range(2):
-                        start_x = breeze_x - percept_size + i * 4
-                        pygame.draw.line(surface, Color.DARK_BLUE, 
-                                    (start_x, breeze_y - percept_size), 
-                                    (start_x + 2, breeze_y + percept_size), 1)
+        elif "turn left" in action:
+            # Quay trái
+            turn_left = {"right": "up", "up": "left", "left": "down", "down": "right"}
+            self.agent_direction = turn_left.get(self.agent_direction, self.agent_direction)
         
-        # Draw coordinate labels
-        font = pygame.font.Font(None, max(16, cell_size // 4))
+        elif "turn right" in action:
+            # Quay phải
+            turn_right = {"right": "down", "down": "left", "left": "up", "up": "right"}
+            self.agent_direction = turn_right.get(self.agent_direction, self.agent_direction)
+
+    def _update_wumpus_for_step(self):
+        """Cập nhật vị trí wumpus cho bước hiện tại"""
+        if not self.wumpus_movements or self.current_step >= len(self.wumpus_movements[0]):
+            return
         
-        # Column labels (bottom)
-        for col in range(self.Game.map.size):
-            x = map_offset_x + col * cell_size + cell_size // 2
-            y = map_offset_y + self.Game.map.size * cell_size + 10
-            label = font.render(str(col), True, Color.WHITE)
-            label_rect = label.get_rect(center=(x, y))
-            surface.blit(label, label_rect)
-        
-        # Row labels (left side)
-        for row in range(self.Game.map.size):
-            x = map_offset_x - 20
-            y = map_offset_y + row * cell_size + cell_size // 2
-            label = font.render(str(row), True, Color.WHITE)
-            label_rect = label.get_rect(center=(x, y))
-            surface.blit(label, label_rect)
-        
-        # Draw legend
-        legend_y = map_offset_y + total_map_height + 40
-        legend_font = pygame.font.Font(None, 20)
-        
-        legend_items = [
-            ("Agent", Color.BLUE),
-            ("Wumpus", Color.DARK_RED),
-            ("Pit", Color.BLACK),
-            ("Gold", Color.YELLOW),
-            ("Stench", Color.GREEN),
-            ("Breeze", Color.CYAN)
-        ]
-        
-        for i, (name, color) in enumerate(legend_items):
-            legend_x = map_offset_x + (i % 3) * 120
-            legend_row_y = legend_y + (i // 3) * 25
+        for wumpus_idx in range(len(self.current_wumpus_pos)):
+            if wumpus_idx >= len(self.wumpus_movements):
+                continue
+                
+            if self.current_step >= len(self.wumpus_movements[wumpus_idx]):
+                continue
             
-            pygame.draw.circle(surface, color, (legend_x, legend_row_y), 8)
-            label = legend_font.render(name, True, Color.WHITE)
-            surface.blit(label, (legend_x + 15, legend_row_y - 8))
-        
-        # Game info overlay
-        info_y = map_offset_y - 30
-        info_font = pygame.font.Font(None, 24)
-        
-        if hasattr(self.Game, 'agent'):
-            agent_info = f"Agent: ({self.Game.agent.location[0]}, {self.Game.agent.location[1]}) facing {getattr(self.Game.agent, 'direction', 'N')}"
-            if hasattr(self.Game.agent, 'has_gold') and self.Game.agent.has_gold:
-                agent_info += " [Has Gold]"
-            if hasattr(self.Game.agent, 'has_arrow') and not self.Game.agent.has_arrow:
-                agent_info += " [No Arrow]"
+            action = self.wumpus_movements[wumpus_idx][self.current_step]
             
-            info_surface = info_font.render(agent_info, True, Color.WHITE)
-            surface.blit(info_surface, (map_offset_x, info_y))
+            if action == 'dead':
+                self.wumpus_alive[wumpus_idx] = False
+            elif action == 'stay' or not self.wumpus_alive[wumpus_idx]:
+                continue
+            else:
+                # Di chuyển wumpus
+                self._move_wumpus(wumpus_idx, action)
+
+    def _update_gold_for_step(self):
+        """Cập nhật trạng thái gold cho bước hiện tại"""
+        if self.current_step >= len(self.actions_list):
+            return
+            
+        action = self.actions_list[self.current_step].lower().strip()
         
-        # Score display (if available)
-        if hasattr(self.Game, 'score'):
-            score_text = f"Score: {self.Game.score}"
-            score_surface = info_font.render(score_text, True, Color.WHITE)
-            surface.blit(score_surface, (map_offset_x, info_y + 25))
+        # Kiểm tra nếu action là grab
+        if "grab" in action:
+            # Tìm gold ở vị trí hiện tại của agent
+            agent_row, agent_col = self.agent_pos
+            for gold_idx, gold_pos in enumerate(self.initial_gold_pos):
+                if gold_pos == (agent_row, agent_col) and not self.gold_collected[gold_idx]:
+                    self.gold_collected[gold_idx] = True
+                    print(f"Gold grabbed at position {gold_pos}")
+                    break
+
+    def _move_wumpus(self, wumpus_idx, direction):
+        """Di chuyển wumpus theo hướng chỉ định"""
+        if self.current_wumpus_pos[wumpus_idx] is None:
+            return
+            
+        row, col = self.current_wumpus_pos[wumpus_idx]
+        max_row = len(self.game.map.grid) - 1
+        max_col = len(self.game.map.grid[0]) - 1
         
+        if direction == 'N':
+            row = max(0, row - 1)
+        elif direction == 'S':
+            row = min(max_row, row + 1)
+        elif direction == 'W':
+            col = max(0, col - 1)
+        elif direction == 'E':
+            col = min(max_col, col + 1)
+        
+        self.current_wumpus_pos[wumpus_idx] = (row, col)
+
+    def _adjacent_cells(self, r, c, rows, cols):
+        for dr, dc in [(-1,0),(1,0),(0,-1),(0,1)]:
+            nr, nc = r+dr, c+dc
+            if 0 <= nr < rows and 0 <= nc < cols:
+                yield nr, nc
+
+    def draw(self, surface):
+        """Vẽ toàn bộ screen"""
+        self._draw_background(surface)
+        self._draw_ui_panel(surface)
+        
+        if self.game:
+            self._draw_game_map(surface)
+
+    def _draw_background(self, surface):
+        """Vẽ background"""
+        self.background.draw(surface)
+        surface.blit(self.overlay, (0, 0))
+
+    def _draw_ui_panel(self, surface):
+        """Vẽ panel UI bên phải"""
+        # Background panel
+        panel_surface = pygame.Surface((self.panel_width, SCREEN_HEIGHT))
+        panel_surface.fill((0, 0, 0))
+        panel_surface.set_alpha(150)
+        surface.blit(panel_surface, (self.panel_x, 0))
+        
+        # Title
+        self.title_text.draw(surface)
+        
+        # Sliders
+        for slider_info in self.sliders:
+            Text(slider_info["name"], "Arial", Color.WHITE, slider_info["pos"][0], slider_info["pos"][1], "left", "body").draw(surface)
+            slider_info["slider"].draw(surface)
+        
+        # Hard mode toggle
+        self.hard_mode_text.draw(surface)
+        self.hard_mode_toggle.draw(surface)
+        
+        # Buttons
+        self.start_button.draw(surface)
+        self.back_button.draw(surface)
+        
+        # Animation controls
+        if self.game_ready and self.actions_list:
+            if not self.is_playing:
+                self.play_button.draw(surface)
+            
+            self.pause_button.draw(surface)
+            self.reset_button.draw(surface)
+            
+            # Speed control
+            self.speed_text.draw(surface)
+            self.speed_slider.draw(surface)
+            
+            # Progress
+            if self.current_step >= len(self.actions_list):
+                progress = f"Step {len(self.actions_list)}/{len(self.actions_list)}: {self.actions_list[-1]}"
+            else:
+                progress = f"Step {min(self.current_step + 1, len(self.actions_list))}/{len(self.actions_list)}: {self.actions_list[self.current_step]}"
+            # progress = f"Step {min(self.current_step + 1, len(self.actions_list))}/{len(self.actions_list)}: {}"
+            progress_text = Text(progress, "Arial", Color.CYAN, self.panel_x + 20, 675, "left", "small")
+            progress_text.draw(surface)
+
+    def _draw_game_map(self, surface):
+        """Vẽ bản đồ game"""
+        if not hasattr(self.game, "map") or not self.game.map.grid:
+            return
+
+        grid = self.game.map.grid
+        rows, cols = len(grid), len(grid[0])
+        
+        # Kích thước tối đa khu vực bản đồ
+        map_width = SCREEN_WIDTH - self.panel_width
+        map_height = SCREEN_HEIGHT
+        margin = 80  # khoảng cách mép ngoài
+
+        # Tính cell_size nhỏ nhất để vừa cả chiều ngang/lọc
+        cell_size = min(
+            (map_width - 2 * margin) // cols,
+            (map_height - 2 * margin) // rows
+        )
+
+        total_map_width = cols * cell_size
+        total_map_height = rows * cell_size
+
+        # Canh giữa theo chiều ngang và dọc
+        start_x = (map_width - total_map_width) // 2
+        start_y = (map_height - total_map_height) // 2
+
+        # Vẽ lưới và ô
+        self._draw_map_content(surface, start_x, start_y, rows, cols, cell_size, grid)
+
+
+    def _draw_map_content(self, surface, start_x, start_y, rows, cols, cell_size, grid):
+        """Vẽ nội dung bản đồ"""
+        # Lấy scaled images
+        images = self._get_scaled_images(cell_size)
+        
+        # Vẽ từng ô
+        for r in range(rows):
+            for c in range(cols):
+                x = start_x + c * cell_size
+                y = start_y + r * cell_size
+                
+                # Vẽ tile nền
+                surface.blit(images["tile"], (x, y))
+
+                # Vẽ pit
+                for obj in grid[r][c]: 
+                    if obj in images and obj == "pit": 
+                        surface.blit(images[obj], (x, y))
+        
+        # Vẽ gold
+        self._draw_gold(surface, start_x, start_y, cell_size, images, grid)
+        
+        # Vẽ wumpus
+        self._draw_wumpuses(surface, start_x, start_y, cell_size, images, grid)
+        
+        # Vẽ agent
+        self._draw_agent(surface, start_x, start_y, cell_size, images, grid)
+
+        # Vẽ breeze, stench
+        self._draw_breeze_stench(surface, start_x, start_y, cell_size, images, grid)
+
+    def _draw_gold(self, surface, start_x, start_y, cell_size, images, grid):
+        """Vẽ gold dựa trên trạng thái animation"""
+        if self.game_ready and self.is_playing:
+            # Vẽ gold chưa được grab
+            for idx, gold_pos in enumerate(self.initial_gold_pos):
+                if not self.gold_collected[idx]:
+                    row, col = gold_pos
+                    x = start_x + col * cell_size
+                    y = start_y + row * cell_size
+                    surface.blit(images["gold"], (x, y))
+        else:
+            # Vẽ gold ở vị trí ban đầu khi không animation
+            for r in range(len(grid)):
+                for c in range(len(grid[0])):
+                    if "gold" in grid[r][c]:
+                        x = start_x + c * cell_size
+                        y = start_y + r * cell_size
+                        surface.blit(images["gold"], (x, y))
+
+    def _draw_wumpuses(self, surface, start_x, start_y, cell_size, images, grid):
+        """Vẽ các wumpus"""
+        if self.game_ready and self.is_playing:
+            # Vẽ wumpus ở vị trí animation
+            for idx, pos in enumerate(self.current_wumpus_pos):
+                if pos and self.wumpus_alive[idx]:
+                    row, col = pos
+                    x = start_x + col * cell_size
+                    y = start_y + row * cell_size
+                    surface.blit(images["wumpus"], (x, y))
+        else:
+            # Vẽ wumpus ở vị trí ban đầu
+            for r in range(len(grid)):
+                for c in range(len(grid[0])):
+                    if "wumpus" in grid[r][c]:
+                        x = start_x + c * cell_size
+                        y = start_y + r * cell_size
+                        surface.blit(images["wumpus"], (x, y))
+
+    def _draw_agent(self, surface, start_x, start_y, cell_size, images, grid):
+        """Vẽ agent"""
+        if self.game_ready and self.is_playing:
+            # Vẽ agent ở vị trí animation với hướng đúng
+            row, col = self.agent_pos
+            x = start_x + col * cell_size
+            y = start_y + row * cell_size
+            agent_img = self._get_rotated_agent_image(cell_size)
+            surface.blit(agent_img, (x, y))
+        else:
+            # Vẽ agent ở vị trí ban đầu
+            for r in range(len(grid)):
+                for c in range(len(grid[0])):
+                    if "agent" in grid[r][c]:
+                        x = start_x + c * cell_size
+                        y = start_y + r * cell_size
+                        surface.blit(images["agent"], (x, y))
+
+    def _draw_breeze_stench(self, surface, start_x, start_y, cell_size, images, grid):
+        rows, cols = len(grid), len(grid[0])
+
+        # 2.1 Breeze từ pit (pit tĩnh, dùng grid)
+        breeze_cells = set()
+        for r in range(rows):
+            for c in range(cols):
+                if "pit" in grid[r][c]:
+                    for nr, nc in self._adjacent_cells(r, c, rows, cols):
+                        breeze_cells.add((nr, nc))
+
+        # 2.2 Stench từ wumpus
+        stench_cells = set()
+        if self.game_ready and self.is_playing:
+            # dùng vị trí wumpus hiện tại và chỉ wumpus còn sống
+            for idx, pos in enumerate(self.current_wumpus_pos):
+                if pos and self.wumpus_alive[idx]:
+                    wr, wc = pos
+                    for nr, nc in self._adjacent_cells(wr, wc, rows, cols):
+                        stench_cells.add((nr, nc))
+        else:
+            # dùng wumpus trong grid khi không chạy animation
+            for r in range(rows):
+                for c in range(cols):
+                    if "wumpus" in grid[r][c]:
+                        for nr, nc in self._adjacent_cells(r, c, rows, cols):
+                            stench_cells.add((nr, nc))
+
+        # 2.3 Blit
+        for (r, c) in breeze_cells:
+            x = start_x + c * cell_size
+            y = start_y + r * cell_size
+            surface.blit(images["breeze"], (x, y))
+
+        for (r, c) in stench_cells:
+            x = start_x + c * cell_size
+            y = start_y + r * cell_size
+            surface.blit(images["stench"], (x, y))
+
+
+    def _get_scaled_images(self, size):
+        """Lấy images đã scale theo kích thước"""
+        if size not in self.scaled_images:
+            self.scaled_images[size] = {
+                "tile": pygame.transform.smoothscale(self.tile_img.image, (size, size)),
+                "agent": pygame.transform.smoothscale(self.agent_img.image, (size, size)),
+                "pit": pygame.transform.smoothscale(self.pit_img.image, (size // 1.5, size // 1.5)),
+                "gold": pygame.transform.smoothscale(self.gold_img.image, (size, size)),
+                "wumpus": pygame.transform.smoothscale(self.wumpus_img.image, (size - 20, size - 20)),
+                "stench": pygame.transform.smoothscale(self.stench_img.image, (size // 2, size // 2)),
+                "breeze": pygame.transform.smoothscale(self.breeze_img.image, (size // 2, size // 2)),
+            }
+        return self.scaled_images[size]
+
+    def _get_rotated_agent_image(self, size):
+        """Lấy hình agent đã xoay theo hướng"""
+        if size not in self.agent_rotated:
+            base_img = pygame.transform.smoothscale(self.agent_img.image, (size, size))
+            self.agent_rotated[size] = {
+                "right": base_img,
+                "left": pygame.transform.flip(base_img, True, False),
+                "up": pygame.transform.rotate(base_img, 90),
+                "down": pygame.transform.rotate(base_img, -90)
+            }
+        return self.agent_rotated[size][self.agent_direction]
 
     def handle_event(self, event):
-        # Handle custom game events
-        if event.type == GAME_STEP_EVENT:
-            self.current_action = event.action
-            self.game_step = event.step
-            return
-        elif event.type == GAME_END_EVENT:
-            self.is_playing = False
-            self.game_finished = True
-            if hasattr(event, 'error'):
-                print(f"Game ended with error: {event.error}")
-            return
+        """Xử lý sự kiện"""
+        # Cập nhật UI controls khi game chưa bắt đầu
+        if not self.game or self.game_ready:
+            for slider_info in self.sliders:
+                slider_info["slider"].handle_event(event)
+            self.hard_mode_toggle.handle_event(event)
+        
+        # Speed slider luôn có thể điều chỉnh
+        if self.game_ready:
+            self.speed_slider.handle_event(event)
 
-        # Regular event handling
-        if not self.is_playing:
-            for item in self.slider_list:
-                item["slider"].handle_event(event)
-            self.toggle.handle_event(event)
-            self.hard_mode = self.toggle.value
-
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  
-            if self.back_btn.is_point_inside(event.pos[0], event.pos[1]):
-                self.stop_game()
+        # Xử lý click buttons
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            x, y = event.pos
+            
+            if self.back_button.is_point_inside(x, y):
                 self.screen_manager.set_screen("menu")
-            elif self.start_btn.is_point_inside(event.pos[0], event.pos[1]) and not self.is_playing:
-                self.start_game()
-            elif self.stop_btn.is_point_inside(event.pos[0], event.pos[1]) and self.is_playing:
-                self.stop_game()
-
-    def cleanup(self):
-        self.stop_game()
+            elif self.start_button.is_point_inside(x, y):
+                self.start_new_game()
+            elif self.game_ready and self.actions_list:
+                if self.play_button.is_point_inside(x, y) and not self.is_playing:
+                    self.start_animation()
+                elif self.pause_button.is_point_inside(x, y):
+                    self.pause_animation()
+                elif self.reset_button.is_point_inside(x, y):
+                    self.stop_animation()
