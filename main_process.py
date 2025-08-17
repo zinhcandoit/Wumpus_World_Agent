@@ -15,14 +15,17 @@ def play(size, pit_density, num_wumpus):
         game.agent_take_percepts()  # Agent takes percepts from the map
         game.agent.get_KB_from_percepts()
         prune_by_radius(game.agent, game.agent.size_known // 2 if game.agent.size_known // 2 > 3 else 3, True) # Pruning KB
-        action = game.agent.choose_action('random')   # We will use random agent / Logic agent for choosing action
+        action = game.agent.choose_action('logic')   # We will use random agent / Logic agent for choosing action
         game.agent.actions.append(action)
         game.update_score()
-        if action == "climb out":
-            break
+        
         flag = game.map.update_map(action, game.agent)
         print('Iter', len(game.agent.actions), 'Action:', action)
         print_map(game.map)
+
+        if action == "climb out":
+            break
+
         if flag == False:
             game.agent.actions.append("die")
             game.update_score()
