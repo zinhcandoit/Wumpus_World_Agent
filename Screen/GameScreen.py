@@ -54,7 +54,7 @@ class GameScreen(Screen):
         
         # Sliders cho cấu hình game
         self.sliders = [
-            {"name": "Map Size:", "slider": Slider(self.panel_center_x, 145, 120, 20, 8, 4, 12), "pos": (self.panel_x + 20, 140)},
+            {"name": "Map Size:", "slider": Slider(self.panel_center_x, 145, 120, 20, 6, 4, 8), "pos": (self.panel_x + 20, 140)},
             {"name": "Pit Density:", "slider": Slider(self.panel_center_x, 225, 120, 20, 0.2, 0.1, 0.5), "pos": (self.panel_x + 20, 220)},
             {"name": "Wumpus Count:", "slider": Slider(self.panel_center_x, 305, 120, 20, 2, 1, 5), "pos": (self.panel_x + 20, 300)},
         ]
