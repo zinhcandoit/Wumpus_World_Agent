@@ -149,9 +149,9 @@ class Agent:
             current_step = len(self.actions)
             focus_pairs = build_focus_pairs_for_decision(self)          
             result = classify_all_local(self.KB, current_step, focus_pairs)
-            for (name, pos), status in sorted(result.items()):
+            '''for (name, pos), status in sorted(result.items()):
                 pos_str = f"({', '.join(map(str, pos))})" if pos else ""
-                print(f"{name}{pos_str}: {status}")
+                print(f"{name}{pos_str}: {status}")'''
 
             get_action = get_possible_actions_now(self, result)
             print("Possible actions:", get_action)
