@@ -64,7 +64,7 @@ class GameScreen(Screen):
         
         # Buttons
         button_width = self.panel_width - 40
-        self.start_button = Button("Start Game", "Arial", button_width, 40, self.panel_center_x, 440, Color.DARK_GREEN, Color.WHITE, "body", "center")
+        self.start_button = Button("Solving New Map", "Arial", button_width, 40, self.panel_center_x, 440, Color.DARK_GREEN, Color.WHITE, "body", "center")
         self.back_button = Button("Back to Menu", "Arial", button_width, 40, self.panel_center_x, 490, Color.DARK_RED, Color.WHITE, "body", "center")
         
         # Animation controls
@@ -395,21 +395,27 @@ class GameScreen(Screen):
         grid = self.game.map.grid
         rows, cols = len(grid), len(grid[0])
         
-        # Tính toán kích thước ô
+        # Kích thước tối đa khu vực bản đồ
         map_width = SCREEN_WIDTH - self.panel_width
         map_height = SCREEN_HEIGHT
-        margin = 20
-        
+        margin = 80  # khoảng cách mép ngoài
+
+        # Tính cell_size nhỏ nhất để vừa cả chiều ngang/lọc
         cell_size = min(
             (map_width - 2 * margin) // cols,
             (map_height - 2 * margin) // rows
         )
-        
-        start_x = margin
-        start_y = (map_height - rows * cell_size) // 2
-        
+
+        total_map_width = cols * cell_size
+        total_map_height = rows * cell_size
+
+        # Canh giữa theo chiều ngang và dọc
+        start_x = (map_width - total_map_width) // 2
+        start_y = (map_height - total_map_height) // 2
+
         # Vẽ lưới và ô
         self._draw_map_content(surface, start_x, start_y, rows, cols, cell_size, grid)
+
 
     def _draw_map_content(self, surface, start_x, start_y, rows, cols, cell_size, grid):
         """Vẽ nội dung bản đồ"""
