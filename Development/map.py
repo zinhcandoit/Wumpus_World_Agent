@@ -33,7 +33,6 @@ class Map:
         return grid
 
     def _get_wumpus_positions(self):
-        """Lấy vị trí hiện tại của tất cả wumpus"""
         positions = []
         for y in range(self.size):
             for x in range(self.size):
@@ -58,7 +57,7 @@ class Map:
         return percepts
     
     def has_adjacent(self, y, x, element):
-        # kiểm tra 4 hướng lân cận có element không
+        # Check 4 direction
         directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
         for dy, dx in directions:
             if 0 <= x + dx < self.size and 0 <= y + dy < self.size:
@@ -68,7 +67,7 @@ class Map:
 
     def update_map(self, action, agent: Agent):
         at_step = len(agent.actions)
-        # Di chuyển agent, kiểm tra chết hay nhặt vàng
+
         if action == "move":
             direction_moves = {'N': (-1, 0), 'S': (1, 0), 'W': (0, -1), 'E': (0, 1)}
             old_y, old_x = agent.location
@@ -80,6 +79,9 @@ class Map:
             self.grid[new_y][new_x].discard('NaN')
             self.grid[new_y][new_x].add('agent')
             self.grid[new_y][new_x].add('OK')
+            # Update since wumpus is dynamic
+            if at_step % 5 != 0:
+                agent.KB.add(make_clause([Literal('wumpus', (old_y, old_x), True, at_step)]))
             if 'wumpus' in self.grid[new_y][new_x] or 'pit' in self.grid[new_y][new_x]:
                 return False  # Agent dies
         elif action == "turn left":
@@ -101,7 +103,7 @@ class Map:
                     new_y, new_x = agent.location[0] + i * dy, agent.location[1] + i * dx
                     if 0 <= new_y < self.size and 0 <= new_x < self.size:
                         if 'wumpus' in self.grid[new_y][new_x]:
-                            # Tìm index của wumpus bị bắn
+                            # Find died wumpus (in theory)
                             killed_wumpus_index = -1
                             for idx, pos in enumerate(self.wumpus_positions):
                                 if pos == (new_y, new_x):
@@ -110,30 +112,30 @@ class Map:
                             
                             self.grid[new_y][new_x].discard('wumpus')
                             self.grid[new_y][new_x].add('NaN')
-                            agent.wumpus_remain -= 1
+                            agent.w_remain -= 1
                             agent.percepts.append(Literal("scream", agent.wumpus_die, False, at_step))
                             
-                            # Đánh dấu wumpus đã chết
+                            # Set wumpus is died
                             if killed_wumpus_index != -1:
                                 self.wumpus_alive[killed_wumpus_index] = False
                                 self.wumpus_positions[killed_wumpus_index] = None
                             break
 
-        # --- WUMPUS MOVE EVERY 5 STEPS ---
+        # Wumpus move every five steps
         if at_step % 5 == 0:
             import random
             direction_moves = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # N, S, W, E
             direction_names = ['N', 'S', 'W', 'E']
 
-            # 1) Khởi tạo hành động cho từng wumpus
+            # Make action for wumpus
             wumpus_actions = []
             for i in range(len(self.wumpus_move)):
                 if not self.wumpus_alive[i]:
                     wumpus_actions.append('dead')
                 else:
-                    wumpus_actions.append('stay')  # Mặc định là stay
+                    wumpus_actions.append('stay')
             
-            # 2) Di chuyển từng con wumpus còn sống
+            # Move wumpus in grid
             reserved_after_move = set()
             
             for wumpus_idx in range(len(self.wumpus_positions)):
@@ -150,7 +152,7 @@ class Map:
                     ny, nx = y + dy, x + dx
                     if not (0 <= ny < self.size and 0 <= nx < self.size):
                         continue
-                    # Không được trùng pit, Không được vướng lẫn nhau
+                    # Wumpus and pit not in same cell, so as 2 wumpus
                     if 'pit' in self.grid[ny][nx]:
                         continue
                     if 'wumpus' in self.grid[ny][nx]:
@@ -158,19 +160,19 @@ class Map:
                     if (ny, nx) in reserved_after_move:
                         continue
 
-                    # --- COMMIT MOVE ---
+                    # Move in grid
                     self.grid[y][x].discard('wumpus')
                     if ('OK' not in self.grid[y][x]):
                         self.grid[y][x].add('NaN')
                     self.grid[ny][nx].discard('NaN')
                     self.grid[ny][nx].add('wumpus')
 
-                    # Cập nhật vị trí wumpus và lưu hành động di chuyển
+                    # Update wumpus movement and location
                     self.wumpus_positions[wumpus_idx] = (ny, nx)
                     wumpus_actions[wumpus_idx] = direction_name
                     moved = True
                     
-                    # Nếu wumpus vừa tới ô có agent -> agent chết
+                    # Wumpus killed agent
                     if (ny, nx) == agent.location:
                         return False
 
@@ -179,13 +181,11 @@ class Map:
 
                 if not moved:
                     reserved_after_move.add((y, x))
-                    # wumpus_actions[wumpus_idx] đã là 'stay'
 
-            # 3) Thêm hành động vào danh sách theo dõi
+            # Store wumpus movement
             for i in range(len(self.wumpus_move)):
                 self.wumpus_move[i].append(wumpus_actions[i])
         else:
-            # Không phải bước di chuyển wumpus
             for i in range(len(self.wumpus_move)):
                 if not self.wumpus_alive[i]:
                     self.wumpus_move[i].append('dead')
@@ -195,11 +195,9 @@ class Map:
         return True
 
     def get_wumpus_movement_history(self):
-        """Trả về lịch sử di chuyển của các con wumpus"""
         return self.wumpus_move
 
     def print_wumpus_movements(self):
-        """In ra lịch sử di chuyển của các con wumpus"""
         for i, moves in enumerate(self.wumpus_move):
             status = "Alive" if self.wumpus_alive[i] else "Dead"
             current_pos = self.wumpus_positions[i] if self.wumpus_alive[i] else "None"

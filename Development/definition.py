@@ -20,4 +20,4 @@ class Literal:
                 and self.at_step == self.at_step)
     
     def __hash__(self):
-        return hash((self.name, self.pos, self.negate))
+        return hash((self.name, self.pos, self.negate, self.at_step))
