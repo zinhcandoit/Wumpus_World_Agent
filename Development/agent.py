@@ -39,6 +39,10 @@ class Agent:
         if "stench" not in percept_names:
             for dy, dx in look_around:
                 nb = (current_pos[0] + dy, current_pos[1] + dx)
+                if 0 <= nb[0] < self.size_known and 0 <= nb[0] < self.size_known:
+                    c = make_clause([Literal("wumpus", nb, True, at_step)])
+                    if c:
+                        self.KB.add(c)
                 if 0 <= nb[0] < self.size_known and 0 <= nb[1] < self.size_known:
                     c = make_clause([Literal("wumpus", nb, True, at_step)])
                     if c:
@@ -48,6 +52,10 @@ class Agent:
         if "breeze" not in percept_names:
             for dy, dx in look_around:
                 nb = (current_pos[0] + dy, current_pos[1] + dx)
+                if 0 <= nb[0] < self.size_known and 0 <= nb[0] < self.size_known:
+                    c = make_clause([Literal("pit", nb, True, at_step)])
+                    if c:
+                        self.KB.add(c)
                 if 0 <= nb[0] < self.size_known and 0 <= nb[1] < self.size_known:
                     c = make_clause([Literal("pit", nb, True, at_step)])
                     if c:
@@ -67,6 +75,11 @@ class Agent:
                 or_literals = []
                 for dy, dx in look_around:
                     nb = (ppos[0] + dy, ppos[1] + dx)
+                    if 0 <= nb[0] < self.size_known and 0 <= nb[0] < self.size_known: 
+                        or_literals.append(Literal("wumpus", nb, False, at_step))
+                        impl = make_clause([Literal("wumpus", nb, True, at_step), Literal("stench", ppos, False, at_step)])
+                        if impl:
+                            self.KB.add(impl)
                     if 0 <= nb[0] < self.size_known and 0 <= nb[1] < self.size_known: 
                         or_literals.append(Literal("wumpus", nb, False, at_step))
                         impl = make_clause([Literal("wumpus", nb, True, at_step), Literal("stench", ppos, False, at_step)])
@@ -84,6 +97,11 @@ class Agent:
                 or_literals = []
                 for dy, dx in look_around:
                     nb = (ppos[0] + dy, ppos[1] + dx)
+                    if 0 <= nb[0] < self.size_known and 0 <= nb[0] < self.size_known: 
+                        or_literals.append(Literal("pit", nb, False, at_step))
+                        impl = make_clause([Literal("pit", nb, True, at_step), Literal("breeze", ppos, False, at_step)])
+                        if impl:
+                            self.KB.add(impl)
                     if 0 <= nb[0] < self.size_known and 0 <= nb[1] < self.size_known: 
                         or_literals.append(Literal("pit", nb, False, at_step))
                         impl = make_clause([Literal("pit", nb, True, at_step), Literal("breeze", ppos, False, at_step)])
@@ -149,9 +167,9 @@ class Agent:
             current_step = len(self.actions)
             focus_pairs = build_focus_pairs_for_decision(self)          
             result = classify_all_local(self.KB, current_step, focus_pairs)
-            '''for (name, pos), status in sorted(result.items()):
+            for (name, pos), status in sorted(result.items()):
                 pos_str = f"({', '.join(map(str, pos))})" if pos else ""
-                print(f"{name}{pos_str}: {status}")'''
+                print(f"{name}{pos_str}: {status}")
 
             get_action = get_possible_actions_now(self, result)
             print("Possible actions:", get_action)
@@ -165,4 +183,3 @@ class Agent:
             if 'shoot' in get_action and self.has_arrow:
                 return 'shoot'
             return get_action.pop(random.randint(0, len(get_action) - 1)) 
-

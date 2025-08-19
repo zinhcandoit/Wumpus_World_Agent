@@ -3,14 +3,14 @@ from Development.definition import Literal
 dynamic_literal = {"wumpus", "stench"}
 
 def make_clause(literals):
-            """Canonicalize clause -> frozenset; drop tautologies (A and ¬A)."""
-            s = set(literals)
-            # drop tautology: if a (name,pos) appears with both negate True/False -> ignore
-            for name_pos in {(lit.name, lit.pos) for lit in s}:
-                negs = {lit.negate for lit in s if (lit.name, lit.pos) == name_pos}
-                if len(negs) > 1:
-                    return None
-            return frozenset(s)
+    """Canonicalize clause -> frozenset; drop tautologies (A and ¬A)."""
+    s = set(literals)
+    # drop tautology: if a (name,pos) appears with both negate True/False -> ignore
+    for name_pos in {(lit.name, lit.pos) for lit in s}:
+        negs = {lit.negate for lit in s if (lit.name, lit.pos) == name_pos}
+        if len(negs) > 1:
+            return None
+    return frozenset(s)
 
 def _var_key(lit):
     # Add step count to dynamic variable
