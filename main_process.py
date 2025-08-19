@@ -35,6 +35,6 @@ def play(size, pit_density, num_wumpus):
             break
     return game.point, game.agent.actions
 
-point, action = play(7, 0.05, 1)  # Example call to play the game with a 4x4 map, 20% pit density, and 2 wumpuses
+point, action = play(6, 0.2, 2)  # Example call to play the game with a 4x4 map, 20% pit density, and 2 wumpuses
 print(f"Final score: {point}")
 print(f"Actions taken: {action}")
