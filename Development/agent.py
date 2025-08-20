@@ -19,7 +19,6 @@ class Agent:
         self.percepts = [] # New percepts at current location
         self.KB = set()
         self.current_plan = [] # Plan for actions
-        self.current_plan = [] # Plan for actions
     
     def update_direction(self, action):
         directions = ['N', 'E', 'S', "W"]
@@ -205,32 +204,30 @@ class Agent:
         elif diff == 3:
             steps.extend(["turn left", "move"])
             return (2, tuple(steps))
+
+    def neighbor_cells(self, loc):
+        neighbors = {
+            'E': (loc[0], loc[1] + 1),
+            'W': (loc[0], loc[1] - 1),
+            'N': (loc[0] - 1, loc[1]),
+            'S': (loc[0] + 1, loc[1])
+        }
+
+        # loại bỏ ô ngoài map
+        for dir, pos in list(neighbors.items()):
+            if pos[0] < 0 or pos[1] < 0 or pos[0] >= self.size_known or pos[1] >= self.size_known:
+                neighbors.pop(dir)
         
-    def select_goal(self, safe, unsafe, candidates):
-        """
-        Chọn goal động dựa trên trạng thái hiện tại
-        """
-        # Nếu có vàng rồi -> ưu tiên thoát
-        if self.has_gold:
-            return self.start_location
+        return neighbors
 
-        # Nếu còn ô an toàn chưa khám phá -> tiếp tục explore
-        if candidates:
-            # chọn ô gần nhất để khám phá
-            return min(candidates, key=lambda c: self.heuristic(self.location, c))
-
-        # Nếu không còn gì để explore -> quay về start
-        return self.start_location
-
-    
     def find_next_action(self):
         """
         Chọn hành động tiếp theo cho Agent dựa trên A* và KB.
         Agent không cần biết trước map size cho đến khi gặp bump.
         """
-
         if self.current_plan:
             return self.current_plan.pop(0)
+
 
         # ========== 1. Lấy trạng thái KB ==========
         current_step = len(self.actions)
@@ -250,79 +247,100 @@ class Agent:
                 safe.add(pos)
             else: unsafe.add(pos)
 
-        safe |= self.visited
-        unsafe -= self.visited
-
         for pos, facts in grouped.items():
             if facts.get("pit") == "UNSAFE" or facts.get("wumpus") == "UNSAFE":
                 unsafe.add(pos)
 
-        # ========== 2. Tìm neighbors ==========
-        neighbors = {
-            'E': (self.location[0], self.location[1] + 1),
-            'W': (self.location[0] , self.location[1] - 1),
-            'N': (self.location[0] - 1, self.location[1]),
-            'S': (self.location[0] + 1, self.location[1])
-            }
+        safe |= self.visited
+        #unsafe -= self.visited
 
-        # Loại bỏ ô ngoài map
-        for dir, pos in list(neighbors.items()):
-            if pos[0] < 0 or pos[1] < 0 or pos[0] > self.size_known - 1 or pos[1] > self.size_known - 1:
-                neighbors.pop(dir)
+        unvisited = set()
+        rows = cols = self.size_known
+
+        for r in range(rows):
+            for c in range(cols):
+                if (r, c) not in self.visited and (r, c) not in unsafe:
+                    unvisited.add((r, c))
+                    
+        # ========== 2. Tìm neighbors ==========
+        neighbors = self.neighbor_cells(self.location)
         
         actions = get_possible_actions_now(self, cell_states)
 
-        # ========== 3. Chiến lược ==========
-        # 3.1 Nếu đang đứng trên vàng -> nhặt
+        # ========== 2. Chiến lược ==========
+        # 2.1 Nếu đang đứng trên vàng -> nhặt
         if 'grab' in actions:
             return 'grab'
+        
+        if 'shoot' in actions and self.has_arrow:
+            return 'shoot'
 
-        # 3.2 Nếu đã có vàng -> tìm đường về start
+        # 2.2 Nếu đã có vàng -> tìm đường về start
         if self.has_gold:
             if self.location == self.start_location and 'climb out' in actions:
                 return 'climb out'
-            goal = self.start_location  # luôn về start
-            self.current_plan = self.plan_path(self.location, self.direction, goal, safe)
+            self.current_plan = self.plan_path(self.location, self.direction, self.start_location, safe)
             if self.current_plan:
                 return self.current_plan.pop(0)
 
-        # 3.3 Nếu chưa có vàng -> tìm safe cell chưa thăm
+        # 2.3 Nếu chưa có vàng -> tìm safe cell hoặc frontier
         candidates = []
-        for cell in safe:
-            if cell not in self.visited:
+
+        # Bước 1: neighbors safe chưa thăm
+        for dir, cell in neighbors.items():
+            if cell in safe and cell not in self.visited:
                 candidates.append(cell)
-            else:
-            # check neighbors của chính cell đó
-                cx, cy = cell
-                neighbor_cells = [
-                    (cx+1, cy), (cx-1, cy),
-                    (cx, cy+1), (cx, cy-1)
-                ]
-                for n in neighbor_cells:
-                    if n in safe and n not in self.visited:
-                        candidates.append(cell)
-                        break
 
-        if candidates:
-            # duyệt lần lượt từ gần đến xa
-            for target in sorted(candidates, key=lambda c: self.heuristic(self.location, c)):
-                plan = self.plan_path(self.location, self.direction, target, safe)
-                if plan:
-                    self.current_plan = plan
-                    return self.current_plan.pop(0)
-            
+        # Bước 2: nếu không có -> frontier từ safe đã thăm
+        if not candidates:
+            for dir, cell in neighbors.items():
+                if cell in self.visited and cell in safe:
+                    sub_neighbors = self.neighbor_cells(cell)
+                    for d, c in sub_neighbors.items():
+                        if c not in self.visited:
+                            candidates.append(c)
 
-        # 3.4 Nếu hết đường đi -> thoát
-        if self.location == self.start_location:
-            return "climb out"
-        else:
-            #fallback: quay lại start
-            plan = self.plan_path(self.location, self.direction, self.start_location, safe)
+        # lọc goal reachable
+        reachable_candidates = []
+        for target in candidates:
+            plan = self.plan_path(self.location, self.direction, target, safe)
             if plan:
+                reachable_candidates.append((target, plan))
+
+        if reachable_candidates:
+            # chọn goal tốt nhất
+            target, plan = min(
+                reachable_candidates,
+                key=lambda x: (
+                    len(x[1]),
+                    # penalty lớn nếu quay lại prev_loc
+                    self.heuristic(self.location, x[0])
+                )
+            )
+            self.current_plan = plan
+            return self.current_plan.pop(0)
+
+        # fallback nếu chưa cover hết bản đồ: mở rộng frontier
+        progress = len(self.visited) + len(unsafe)
+        total = self.size_known * self.size_known
+        coverage_ratio = progress / total
+
+        if coverage_ratio < 0.9:
+            frontier = []
+            for v in unvisited:
+                    if (0 <= v[0] < self.size_known and 
+                        0 <= v[1] < self.size_known and
+                        v not in self.visited and
+                        v not in unsafe):
+                        plan = self.plan_path(self.location, self.direction, v, safe)
+                        if plan:
+                            frontier.append((v, plan))
+            if frontier:
+                
                 self.current_plan = plan
                 return self.current_plan.pop(0)
-            return "climb out"
-    
+            
+            
     def plan_path(self, start, start_dir, goal, safe_cells):
         """
         Tìm đường đi bằng A* từ start -> goal qua các safe_cells.
@@ -388,5 +406,13 @@ class Agent:
                 return 'shoot'
             return get_action.pop(random.randint(0, len(get_action) - 1))
         elif mode == 'logic':
+            '''# Code tĩnh cho w
+            result = classify_all_literals(self.KB) 
+            for (name, pos), status in sorted(result.items()):
+                pos_str = f"({', '.join(map(str, pos))})" if pos else ""
+                print(f"{name}{pos_str}: {status}")
+            get_action = get_possible_actions(self, result)'''
+            # Code động cho w
+
             get_action = self.find_next_action()
             return get_action
