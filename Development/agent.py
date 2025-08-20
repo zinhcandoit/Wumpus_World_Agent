@@ -19,6 +19,7 @@ class Agent:
         self.percepts = [] # New percepts at current location
         self.KB = set()
         self.current_plan = [] # Plan for actions
+        self.last_loc = None
     
     def update_direction(self, action):
         directions = ['N', 'E', 'S', "W"]
@@ -221,61 +222,42 @@ class Agent:
         return neighbors
 
     def find_next_action(self):
-        """
-        Chọn hành động tiếp theo cho Agent dựa trên A* và KB.
-        Agent không cần biết trước map size cho đến khi gặp bump.
-        """
         if self.current_plan:
             return self.current_plan.pop(0)
 
-
-        # ========== 1. Lấy trạng thái KB ==========
+        # Get cell states from KB
         current_step = len(self.actions)
         focus_pairs = build_focus_pairs_for_decision(self)
         cell_states = classify_all_local(self.KB, current_step, focus_pairs)
 
         safe, unsafe = set(), set()
-
         grouped = {}
         for (name, pos), state in cell_states.items():
-            if pos not in grouped:
-                grouped[pos] = {}
-            grouped[pos][name] = state
+            grouped.setdefault(pos, {})[name] = state
 
         for pos, facts in grouped.items():
             if facts.get("pit") == "SAFE" and facts.get("wumpus") == "SAFE":
                 safe.add(pos)
-            else: unsafe.add(pos)
-
-        for pos, facts in grouped.items():
-            if facts.get("pit") == "UNSAFE" or facts.get("wumpus") == "UNSAFE":
+            elif facts.get("pit") == "UNSAFE" or facts.get("wumpus") == "UNSAFE":
                 unsafe.add(pos)
 
+        # Visited is safe, previous location is not unsafe
         safe |= self.visited
-        #unsafe -= self.visited
+        if self.last_loc:
+            unsafe.remove(self.last_loc)
 
-        unvisited = set()
         rows = cols = self.size_known
+        unvisited = {(r, c) for r in range(rows) for c in range(cols)
+                    if (r, c) not in self.visited and (r, c) not in unsafe}
 
-        for r in range(rows):
-            for c in range(cols):
-                if (r, c) not in self.visited and (r, c) not in unsafe:
-                    unvisited.add((r, c))
-                    
-        # ========== 2. Tìm neighbors ==========
+        # Get neighbor cells and possible action
         neighbors = self.neighbor_cells(self.location)
-        
         actions = get_possible_actions_now(self, cell_states)
 
-        # ========== 2. Chiến lược ==========
-        # 2.1 Nếu đang đứng trên vàng -> nhặt
         if 'grab' in actions:
             return 'grab'
-        
         if 'shoot' in actions and self.has_arrow:
             return 'shoot'
-
-        # 2.2 Nếu đã có vàng -> tìm đường về start
         if self.has_gold:
             if self.location == self.start_location and 'climb out' in actions:
                 return 'climb out'
@@ -283,62 +265,68 @@ class Agent:
             if self.current_plan:
                 return self.current_plan.pop(0)
 
-        # 2.3 Nếu chưa có vàng -> tìm safe cell hoặc frontier
-        candidates = []
+        # Choose safe location by A*
+        # Get safe neighbor that not in visited
+        candidates = [cell for cell in neighbors.values() if cell in safe and cell not in self.visited]
 
-        # Bước 1: neighbors safe chưa thăm
-        for dir, cell in neighbors.items():
-            if cell in safe and cell not in self.visited:
-                candidates.append(cell)
-
-        # Bước 2: nếu không có -> frontier từ safe đã thăm
+        # If not, expand it
         if not candidates:
-            for dir, cell in neighbors.items():
+            for cell in neighbors.values():
                 if cell in self.visited and cell in safe:
-                    sub_neighbors = self.neighbor_cells(cell)
-                    for d, c in sub_neighbors.items():
+                    for c in self.neighbor_cells(cell).values():
                         if c not in self.visited:
                             candidates.append(c)
 
-        # lọc goal reachable
-        reachable_candidates = []
+        # Get goal pos
+        reachable = []
         for target in candidates:
             plan = self.plan_path(self.location, self.direction, target, safe)
             if plan:
-                reachable_candidates.append((target, plan))
+                reachable.append((target, plan))
 
-        if reachable_candidates:
-            # chọn goal tốt nhất
-            target, plan = min(
-                reachable_candidates,
-                key=lambda x: (
-                    len(x[1]),
-                    # penalty lớn nếu quay lại prev_loc
-                    self.heuristic(self.location, x[0])
-                )
-            )
+        if reachable:
+            target, plan = min(reachable, key=lambda x: (len(x[1]), self.heuristic(self.location, x[0])))
             self.current_plan = plan
             return self.current_plan.pop(0)
 
-        # fallback nếu chưa cover hết bản đồ: mở rộng frontier
+        # Expand frontier
         progress = len(self.visited) + len(unsafe)
         total = self.size_known * self.size_known
-        coverage_ratio = progress / total
-
-        if coverage_ratio < 0.9:
+        if (progress / total) < 0.9:
             frontier = []
             for v in unvisited:
-                    if (0 <= v[0] < self.size_known and 
-                        0 <= v[1] < self.size_known and
-                        v not in self.visited and
-                        v not in unsafe):
-                        plan = self.plan_path(self.location, self.direction, v, safe)
-                        if plan:
-                            frontier.append((v, plan))
+                plan = self.plan_path(self.location, self.direction, v, safe)
+                if plan:
+                    frontier.append((v, plan))
             if frontier:
-                
+                target, plan = min(frontier, key=lambda x: (len(x[1]), self.heuristic(self.location, x[0])))
                 self.current_plan = plan
                 return self.current_plan.pop(0)
+
+        # Fall back (get last loc to avoid ping pong movement)
+        prev_loc = getattr(self, '_last_loc', None)
+        y, x = self.location
+        direction_moves = {'N': (-1, 0), 'S': (1, 0), 'W': (0, -1), 'E': (0, 1)}
+        dy, dx = direction_moves[self.direction]
+        front_cell = (y + dy, x + dx)
+
+        can_move_forward = ('move' in actions) and (front_cell not in unsafe)
+        if prev_loc is not None and front_cell == prev_loc:
+            can_move_forward = False
+
+        # tier list: move -> turn left -> turn right
+        if can_move_forward:
+            action = 'move'
+        elif 'turn left' in actions:
+            action = 'turn left'
+        elif 'turn right' in actions:
+            action = 'turn right'
+        else:
+            action = 'turn left' if 'turn left' in actions else ('turn right' if 'turn right' in actions else 'move')
+
+        # Store that location for next call
+        self._last_loc = self.location
+        return action
             
             
     def plan_path(self, start, start_dir, goal, safe_cells):
@@ -354,6 +342,7 @@ class Agent:
         frontier = []
         heappush(frontier, (0, start_state, []))
         visited = set()
+        forbid_first = getattr(self, '_last_loc', None)
 
         while frontier:
             cost, (pos, facing), path = heappop(frontier)
@@ -368,18 +357,13 @@ class Agent:
                 new_pos = (pos[0]+dy, pos[1]+dx)
                 if new_pos not in safe_cells:
                     continue
+                if not path and forbid_first is not None and new_pos == forbid_first:
+                    continue
                 turn_steps_cost, turn_steps = self.turn_cost(facing, d)
                 new_path = path + list(turn_steps)
                 new_cost = cost + turn_steps_cost
                 heappush(frontier, (new_cost + self.heuristic(new_pos, goal),
-                                (new_pos, d), new_path))
-                
-        for d in directions:
-            dy, dx = moves[d]
-            back_pos = (start[0]+dy, start[1]+dx)
-            if back_pos in self.visited and back_pos in safe_cells:
-                # tìm plan quay về back_pos
-                return self.plan_path(start, start_dir, back_pos, safe_cells)        
+                                (new_pos, d), new_path))      
 
         return []
 
@@ -388,10 +372,6 @@ class Agent:
             current_step = len(self.actions)
             focus_pairs = build_focus_pairs_for_decision(self)          
             result = classify_all_local(self.KB, current_step, focus_pairs)
-
-            # for (name, pos), status in sorted(result.items()):
-            #     pos_str = f"({', '.join(map(str, pos))})" if pos else ""
-            #     print(f"{name}{pos_str}: {status}")
 
             get_action = get_possible_actions_now(self, result)
             print("Possible actions:", get_action)
@@ -406,13 +386,6 @@ class Agent:
                 return 'shoot'
             return get_action.pop(random.randint(0, len(get_action) - 1))
         elif mode == 'logic':
-            '''# Code tĩnh cho w
-            result = classify_all_literals(self.KB) 
-            for (name, pos), status in sorted(result.items()):
-                pos_str = f"({', '.join(map(str, pos))})" if pos else ""
-                print(f"{name}{pos_str}: {status}")
-            get_action = get_possible_actions(self, result)'''
-            # Code động cho w
 
             get_action = self.find_next_action()
             return get_action
