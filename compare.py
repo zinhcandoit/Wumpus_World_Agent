@@ -2,7 +2,7 @@ from Development.gameState import Game
 from Development.algorithm import prune_by_radius
 
 class Compare:
-    STRATEGY = {"random", "heuristic"}
+    STRATEGY = {"random", "logic"}
 
     def __init__(self, size=7, pit_density=0.1, num_wumpus=1, times=10, max_actions=300):
         self.size = size
@@ -104,10 +104,10 @@ class Compare:
         lenA = result["avg_length"][a]
         lenB = result["avg_length"][b]
 
-        headers = ["Chỉ số", a, b]
+        headers = ["Index", a, b]
         rows = [
-            ["Tỉ lệ thành công", f"{rateA:.2%}", f"{rateB:.2%}"],
-            ["Độ dài trung bình", f"{lenA:.2f}", f"{lenB:.2f}"],
+            ["Success rate", f"{rateA:.2%}", f"{rateB:.2%}"],
+            ["Average length", f"{lenA:.2f}", f"{lenB:.2f}"],
         ]
 
         colw = [max(len(str(x)) for x in col) for col in zip(headers, *rows)]
@@ -121,6 +121,6 @@ class Compare:
 
 
 if __name__ == "__main__":
-    cmp = Compare(size=4, pit_density=0.1, num_wumpus=1, times=10)
-    result = cmp.run("random", "heuristic")
+    cmp = Compare(size=4, pit_density=0.1, num_wumpus=1, times=100)
+    result = cmp.run("random", "logic")
     cmp.print_table(result)
